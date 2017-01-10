@@ -204,6 +204,30 @@ def significance(args, log, datasets):
             rc_fail()
 
 
+def filter_combinations(args, log, datasets):
+    dir = args.output
+    script_path = os.path.dirname(__file__)
+
+    sys.stdout.write('Filter combinations\n')
+    log.write('\n# Filter combinations\n')
+
+    command = [os.path.join(script_path, 'similarity_filter.py'),
+               '-c', os.path.join(dir, 'combinations.csv'),
+               '-v', args.v_segments,
+               '-o', os.path.join(dir, 'f_combinations.csv')
+               '-l', os.path.join(dir, 'filter.log'),
+               '--range', args.range[0], args.range[1],
+               '--source-dist', args.source_dist if args.source_dist else args.length,
+               '--target-dist', args.target_dist,
+               '--target-mf', args.target_mf]
+    command = [str(x) for x in command]
+    log.write('\t%s\n' % ' '.join(command))
+    if subprocess.run(command).returncode:
+        rc_fail()
+
+    sys.stdout.write('Segments generated ::::: %s\n' % os.path.join(dir, 'segments.fa'))
+
+
 def generate(args, log, datasets):
     dir = args.output
     script_path = os.path.dirname(__file__)
@@ -249,11 +273,15 @@ def run(args, human_args):
         expand_mismatches(args, log, datasets)
         combinations(args, log, datasets, 'combinations_b')
         significance(args, log, datasets)
+        filter_combinations(args, log, datasets)
         generate(args, log, datasets)
 
 
 def main():
-    parser = argparse.ArgumentParser(description='pipeline for detecting novel segments', add_help=False)
+    parser = argparse.ArgumentParser(description='pipeline for detecting novel segments. '
+                                                 'Created by Timofey Prodanov (timofey.prodanov@gmail.com)',
+                                     usage='%(prog)s -i DATASETS -v V_SEGMENTS -o OUT_DIR',
+                                     add_help=False)
     io_args = parser.add_argument_group('inpur/output arguments')
     io_args.add_argument('-i', '--input', required=True, metavar='FILE', type=argparse.FileType(),
                          help='file with lines <name> <path to cdr folder>.'
@@ -285,7 +313,6 @@ def main():
     human_args += [('Combination detection', None), ('Length', 'length'), ('Coverage w/ single J hit', 'cov_single_j'),
                    ('Coverage w/ multiple J hits', 'cov_mult_j'), ('Human readable', 'human_readable')]
 
-
     exp_args = parser.add_argument_group('combination expansion arguments')
     exp_args.add_argument('--comb-coverage', help='combination coverage threshold (default: 50)',
                           type=int, default=50, metavar='INT', dest='comb_coverage')
@@ -293,13 +320,27 @@ def main():
                           type=float, default=0.9, metavar='FLOAT', dest='expansion_rate')
     human_args += [('Combination expansion', None), ('Combination coverage', 'comb_coverage'), ('Expansion rate', 'expansion_rate')]
 
-    gen_args = parser.add_argument_group('segments generation arguments')
-    gen_args.add_argument('--min-significance', help='min significance (default: 20)',
-                          type=int, metavar='INT', default=20, dest='min_significance')
-    human_args += [('Segments generation', None), ('Min significance', 'min_significance')]
+    filter_args = parser.add_argument_group('segments filtering arguments')
+    filter_args.add_argument('--min-significance', help='min significance (default: 20)',
+                             type=int, metavar='INT', default=20, dest='min_significance')
+    filter_args.add_argument('--source-dist', help='minimum required distance to '
+                                                   'any source segment (default: --length)',
+                             metavar='INT', dest='source_dist', type=int)
+    filter_args.add_argument('--target-dist', help='minimum reliable distance to '
+                                                   'any target combination (default: 3)',
+                             metavar='INT', dest='target_dist', type=int, default=3)
+    filter_args.add_argument('--target-mf', help='significance multiplication factor '
+                                                 'to filter out combination with unreliable '
+                                                 'target distance (default: 4)',
+                             metavar='FLOAT', dest='target_mf', type=float, default=4)
+    human_args += [('Segments filtering', None), ('Min significance', 'min_significance'),
+                   ('Distance to source', 'source_dist'), ('Distance to target', 'target_dist'),
+                   ('Significance multiplication factor', 'target-mf')]
 
     other = parser.add_argument_group('other arguments')
     other.add_argument('-h', '--help', action='help', help='show this help message and exit')
+    other.add_argument('--version', action='version', help='show version',
+                       version='novVement 0.1.0 ::: Created by Timofey Prodanov (timofey.prodanov@gmail.com)')
 
     args = parser.parse_args()
 

@@ -97,12 +97,12 @@ def main():
                                                    'any source segment (default: 2)',
                              metavar='INT', dest='source_dist', type=int, default=2)
     filter_args.add_argument('--target-dist', help='minimum reliable distance to '
-                                                   'any target combination (default: 2)',
-                             metavar='INT', dest='target_dist', type=int, default=2)
+                                                   'any target combination (default: 3)',
+                             metavar='INT', dest='target_dist', type=int, default=3)
     filter_args.add_argument('--target-mf', help='significance multiplication factor '
                                                  'to filter out combination with unreliable '
-                                                 'target distance (default: 3)',
-                             metavar='FLOAT', dest='target_mf', type=float, default=3)
+                                                 'target distance (default: 4)',
+                             metavar='FLOAT', dest='target_mf', type=float, default=4)
 
     other = parser.add_argument_group('other arguments')
     other.add_argument('-h', '--help', action='help', help='show this help message and exit')

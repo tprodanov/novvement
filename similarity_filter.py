@@ -11,32 +11,41 @@ def distance(seq1, seq2):
     return sum(nt1 != nt2 for nt1, nt2 in itertools.zip_longest(seq1, seq2))
 
 
-def source_distance(seq, source):
-    return min(distance(seq, seq2) for seq2 in source)
-
-
-def target_distance(seq, target):
-    nearest_sign = None
+def min_distance(seq, source):
+    nearest = None
     dist = None
 
-    for seq2, significance in target:
+    for entry in source:
+        seq2 = entry[0]
         d = distance(seq, seq2)
+
         if dist is None or d < dist:
             dist = d
-            nearest_sign = significance
-    return dist, nearest_sign
+            nearest = entry[1:]
+    return (dist, *nearest) if dist is not None else (None, )
 
 
-def keep(seq, significance, source, target, args):
-    if args.source_distance and source_distance(seq, source) < args.source_distance:
+def keep(name, seq, significance, source, target, args):
+    if args.source_dist:
+        dist, gene = min_distance(seq, source)
+        if dist < args.source_dist:
+            args.log.write('%s is too close to %s (distance %d)\n' % (name, gene, dist))
+            return False
+
+    if not args.target_dist:
+        return True
+    
+    if not target:
+        return True
+
+    dist, nearest_significance, oth = min_distance(seq, target)
+    if dist >= args.target_dist:
+        return True
+    if significance * args.target_mf < nearest_significance:
+        args.log.write('%s is too close to %s (distance %d, mf %d / %d = %.2f)\n'
+                       % (name, oth, dist, nearest_significance, significance, nearest_significance / significance))
         return False
-    if not args.target_distance:
-        return True
-
-    dist, nearest_significance = target_distance(seq, target)
-    if dist is None or dist <= args.target_distance:
-        return True
-    return significance * args.target_mf >= nearest_significance
+    return True
 
 
 def run(args):
@@ -46,7 +55,7 @@ def run(args):
     l, r = args.range
     l -= 1
 
-    source = [gene.seq[l:r] for gene in segments.values()]
+    source = [(gene.seq[l:r], gene.name) for gene in segments.values()]
     target = []
 
     line = next(inp)
@@ -55,20 +64,22 @@ def run(args):
     outp.write('# %s\n' % ' '.join(sys.argv))
     outp.write(line)
 
-    for line in inp:
+    for i, line in enumerate(inp):
         split_line = line.strip().split('\t')
         gene = split_line[0]
         significance = int(split_line[1])
         combination = split_line[3]
-        seq = generate_novel_segment(segments[gene].seq, combination)[l:r]
+        seq = generate_possible_igv.generate_novel_segment(segments[gene].seq, combination)[l:r]
 
-        if keep(seq, significance, source, target, args):
+        name = '%s-M%d' % (gene, i + 1)
+
+        if keep(name, seq, significance, source, target, args):
             outp.write(line)
-            target.append((seq, significance))
+            target.append((seq, significance, name))
 
 
 def main():
-    parser = argparse.ArgumentParser(description='filter too similar combinations', add_help=False)
+    parser = argparse.ArgumentParser(description='filter out too similar combinations', add_help=False)
     io_args = parser.add_argument_group('input/output arguments')
     io_args.add_argument('-c', '--combinations', help='input: target combinations csv file',
                          type=argparse.FileType(), required=True, metavar='FILE')
@@ -76,6 +87,8 @@ def main():
                          type=argparse.FileType(), required=True, metavar='FILE', dest='v_segments')
     io_args.add_argument('-o', '--output', help='output: filtered combinations csv file',
                          type=argparse.FileType('w'), metavar='FILE', required=True)
+    io_args.add_argument('-l', '--log', help='output: log file (optional)',
+                         type=argparse.FileType('w'), metavar='FILE', default='/dev/null')
 
     filter_args = parser.add_argument_group('filter arguments')
     filter_args.add_argument('--range', help='positions range (default: [60, 280])',
@@ -95,7 +108,7 @@ def main():
     other.add_argument('-h', '--help', action='help', help='show this help message and exit')
 
     args = parser.parse_args()
-
+    run(args)
 
 
 if __name__ == '__main__':

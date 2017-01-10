@@ -12,28 +12,28 @@ class Tee:
         self.g.write(*args, **kwargs)
 
 
-def v_alignment_to_mutations(v_alignment, potential_mutations):
+def v_alignment_to_mismatches(v_alignment, potential_mismatches):
     while next(v_alignment).startswith('#'):
         pass
     prev_read = None
 
     for line in v_alignment:
-        gene, read, mut_type, position, nt = line.strip().split()
+        , read, mut_type, position, nt = line.strip().split()
         position = int(position)
 
-        if gene not in potential_mutations:
+        if segment not in potential_mismatches:
             continue
         if prev_read != read:
-            if prev_read and read_mutations:
-                read_mutations.sort(key=itemgetter(0))
-                yield prev_read, prev_gene, read_mutations
+            if prev_read and read_mismatches:
+                read_mismatches.sort(key=itemgetter(0))
+                yield prev_read, prev_segment, read_mismatches
             prev_read = read
-            prev_gene = gene
-            read_mutations = []
-            gene_mutations = potential_mutations[gene]
+            prev_segment = segment
+            read_mismatches = []
+            segment_mismatches = potential_mismatches[segment]
 
-        if (position, nt) in gene_mutations:
-            read_mutations.append((position, nt))
-    if prev_read and read_mutations:
-        read_mutations.sort(key=itemgetter(0))
-        yield prev_read, prev_gene, read_mutations
+        if (position, nt) in segment_mismatches:
+            read_mismatches.append((position, nt))
+    if prev_read and read_mismatches:
+        read_mismatches.sort(key=itemgetter(0))
+        yield prev_read, prev_segment, read_mismatches

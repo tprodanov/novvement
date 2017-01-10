@@ -14,14 +14,17 @@ def mkdir(path):
         pass
 
 
-def log_header(log, args):
+def log_header(log, args, human_args):
     log.write('# Command: %s\n' % ' '.join(sys.argv))
-    log.write('#\tCombinations: %s\n' % args.combinations.name)
-    log.write('#\tDatasets: %s\n' % args.datasets.name)
-    log.write('#\tOutput: %s\n' % args.output)
-    log.write('#\tForce: %s\n' % args.force)
-    log.write('\n\n')
-    log.flush()
+    args = vars(args)
+
+    for k, v in human_args:
+        if not v:
+            log.write('#\t%s\n' % k)
+        else:
+            v = args[v]
+            log.write('#\t\t%s: %s\n' % (k, v.name if isinstance(v, io.IOBase) else v))
+    log.write('\n')
 
 
 def load_datasets(f, log):
@@ -44,7 +47,7 @@ def load_datasets(f, log):
         else:
             datasets[-1][1].append(tuple(s))
             i += 1
-    
+
     log.write('# Loaded %d datasets within %d individuals from %s\n\n'
               % (i, len(datasets), f.name))
     return datasets
@@ -67,7 +70,12 @@ def validate(args, datasets, log):
                        '-v', os.path.join(datasets_path, path),
                        '-c', args.combinations.name,
                        '-n', '%s-%s' % (individual, name),
-                       '-d', os.path.join(dir, individual, name)]
+                       '-d', os.path.join(dir, individual, name),
+                       '--range', args.range[0], args.range[1],
+                       '--neigh', args.neigh,
+                       '--neigh-overhead', args.neigh_overhead,
+                       '--neigh-good', args.neigh_good,
+                       '--neigh-bad', args.neigh_bad]
             log.write('\t%s\n' % ' '.join(command))
             subprocess.run(command)
         sys.stdout.write('\n')
@@ -90,7 +98,12 @@ def combined_validate(args, datasets, log):
                    '-v', '-',
                    '-c', args.combinations.name,
                    '-n', individual,
-                   '-d', os.path.join(dir, individual)]
+                   '-d', os.path.join(dir, individual),
+                   '--range', args.range[0], args.range[1],
+                   '--neigh', args.neigh,
+                   '--neigh-overhead', args.neigh_overhead,
+                   '--neigh-good', args.neigh_good,
+                   '--neigh-bad', args.neigh_bad]
         log.write('\t%s | %s\n' % (' '.join(cat_command), ' ' .join(command)))
 
         p1 = subprocess.Popen(cat_command, stdout=subprocess.PIPE)
@@ -152,17 +165,41 @@ def run(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='use memory Rep-seq to validate novel segments')
-    parser.add_argument('-c', '--combinations', help='combinations csv file', metavar='FILE',
+    parser = argparse.ArgumentParser(description='use memory Rep-seq to validate novel segments', add_help=False)
+    io_args = parser.add_argument_group('input/output arguments')
+    io_args.add_argument('-c', '--combinations', help='combinations csv file', metavar='FILE',
                         type=argparse.FileType(), required=True)
-    parser.add_argument('-d', '--datasets', help='datasets file, that specifies paths to datasets from different individuals. '
+    io_args.add_argument('-d', '--datasets', help='datasets file, that specifies paths to datasets from different individuals. '
                                                  'Format: line <name> indicates beginning of a single individual. '
                                                  'Following lines <name> <path to v_alignment fasta> specify this individual datasets. ',
                         metavar='FILE', type=argparse.FileType(), required=True)
-    parser.add_argument('-o', '--output', help='output directory', metavar='DIR', required=True)
-    parser.add_argument('-f', '--force', help='override files in output directory', action='store_true')
+    io_args.add_argument('-o', '--output', help='output directory', metavar='DIR', required=True)
+    io_args.add_argument('-f', '--force', help='override files in output directory', action='store_true')
+    human_args = [('Input/output arguments', None), ('Combinations', 'combinations'), ('Datasets', 'datasets'),
+                  ('Output directory', 'output'), ('Force', 'force')]
 
+    val_args = parser.add_argument_group('validating arguments')
+    val_args.add_argument('--range', help='positions range (default: [60, 290])',
+                          metavar=('INT', 'INT'), nargs=2, default=[60, 290], type=int)
+    val_args.add_argument('--neigh', help='position neighborhood size (default: 3)',
+                          metavar='INT', default=3, type=int)
+    val_args.add_argument('--neigh-overhead', help='acceptable mismatch rate overhead '
+                                                   'in the position neighborhood (default: 1.1)',
+                          metavar='FLOAT', default=1.1, type=float, dest=neigh_overhead)
+    val_args.add_argument('--neigh-good', help='position is treated good, if its mismatch rate is less '
+                                               'than --neigh-good (default: 0.2)',
+                          metavar='FLOAT', default=0.2, type=float, dest=neigh_good)
+    val_args.add_argument('--neigh-bad', help='position is treated good, if its mismatch rate is more '
+                                               'than --neigh-bad (default: 0.8)',
+                          metavar='FLOAT', default=0.8, type=float, dest=neigh_good)
+    human_args += [('Validation arguments', None), ('Range', 'range'), ('neighborhood size', 'neigh'),
+                   ('Neighborhood overhead', 'neigh_overhead'), ('Neighborhood: good', 'neigh_good'),
+                   ('Neighborhood: bad', 'neigh_bad')]
+
+    other = parser.add_argument_group('other arguments')
+    other.add_argument('-h', '--help', action='help', help='show this help message and exit')
     args = parser.parse_args()
+
     try:
         run(args)
     except KeyboardInterrupt:
@@ -172,4 +209,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

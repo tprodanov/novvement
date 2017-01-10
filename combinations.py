@@ -5,27 +5,27 @@ from collections import Counter
 from collections import defaultdict
 from operator import itemgetter
 from extra import utilities
-import potential_mutations
+import potential_mismatches
 import os
 import re
 import sys
 
 
-def index_mutations(mutations):
-    mutations_list = dict()
-    mutations_ind = dict()
-    for gene, gene_mutations in mutations.items():
-        mutations_list[gene] = list(sorted(gene_mutations, key=itemgetter(0)))
-        mutations_ind[gene] = dict()
-        for i in range(len(mutations_list[gene])):
-            mutations_ind[gene][mutations_list[gene][i]] = i
-    return mutations_list, mutations_ind
+def index_mismatches(mismatches):
+    mismatches_list = dict()
+    mismatches_ind = dict()
+    for segment, segment_mismatches in mismatches.items():
+        mismatches_list[segment] = list(sorted(segment_mismatches, key=itemgetter(0)))
+        mismatches_ind[segment] = dict()
+        for i in range(len(mismatches_list[segment])):
+            mismatches_ind[segment][mismatches_list[segment][i]] = i
+    return mismatches_list, mismatches_ind
 
 
-def combination_hash(combination, mutations_ind):
+def combination_hash(combination, mismatches_ind):
     h = 0
     for mut in combination:
-        h += 2 ** (mutations_ind[mut])
+        h += 2 ** (mismatches_ind[mut])
     return h
 
 
@@ -38,29 +38,29 @@ class Combination:
 
 
 class Combinations:
-    def __init__(self, v_alignment, mutations, j_hit):
-        # self.mutations, self.mutations_ind = index_mutations(mutations)
-        self.mutations = mutations
-        self.mutations_ind = index_mutations(mutations)[1]
+    def __init__(self, v_alignment, mismatches, j_hit):
+        # self.mismatches, self.mismatches_ind = index_mismatches(mismatches)
+        self.mismatches = mismatches
+        self.mismatches_ind = index_mismatches(mismatches)[1]
 
         self.mut_combinations = defaultdict(dict)
-        for read, gene, read_mutations in utilities.v_alignment_to_mutations(v_alignment,
-                                                                             self.mutations):
-            h = combination_hash(read_mutations, self.mutations_ind[gene])
-            if h not in self.mut_combinations[gene]:
-                self.mut_combinations[gene][h] = Combination(read_mutations)
+        for read, segment, read_mismatches in utilities.v_alignment_to_mismatches(v_alignment,
+                                                                             self.mismatches):
+            h = combination_hash(read_mismatches, self.mismatches_ind[segment])
+            if h not in self.mut_combinations[segment]:
+                self.mut_combinations[segment][h] = Combination(read_mismatches)
 
-            self.mut_combinations[gene][h].coverage += 1
-            self.mut_combinations[gene][h].j_hit[j_hit[read]] += 1
+            self.mut_combinations[segment][h].coverage += 1
+            self.mut_combinations[segment][h].j_hit[j_hit[read]] += 1
 
     def write(self, outp, length, cov1, covM, validation):
-        outp.write('gene\tcoverage\tlength\tcombination\tj_hit')
+        outp.write('segment\tcoverage\tlength\tcombination\tj_hit')
         if validation:
             outp.write('\tdatasets')
         outp.write('\n')
 
-        for gene, gene_combinations in self.mut_combinations.items():
-            for combination in gene_combinations.values():
+        for segment, segment_combinations in self.mut_combinations.items():
+            for combination in segment_combinations.values():
                 if len(combination.combination) < length:
                     continue
                 if len(combination.j_hit) == 1 and combination.coverage < cov1:
@@ -68,7 +68,7 @@ class Combinations:
                 if len(combination.j_hit) > 1 and combination.coverage < covM:
                     continue
                 outp.write('%s\t%d\t%d\t%s\t%s' %
-                           (gene, combination.coverage, len(combination.combination),
+                           (segment, combination.coverage, len(combination.combination),
                             ','.join('%d:%s' % mut for mut in combination.combination),
                             ','.join('%s:%d' % j for j in combination.j_hit.items())))
                 if validation:
@@ -77,9 +77,9 @@ class Combinations:
                 outp.write('\n')
 
     def write_human(self, outp, length, cov1, covM):
-        for gene, gene_combinations in self.mut_combinations.items():
-            outp.write('-------\n%s\n' % gene)
-            for combination in gene_combinations.values():
+        for segment, segment_combinations in self.mut_combinations.items():
+            outp.write('-------\n%s\n' % segment)
+            for combination in segment_combinations.values():
                 if len(combination.combination) < length:
                     continue
                 if len(combination.j_hit) == 1 and combination.coverage < cov1:
@@ -100,19 +100,19 @@ class Combinations:
                     outp.write('\n')
 
     def validate_v_alignment(self, v_alignment, name):
-        for _, gene, read_mutations in utilities.v_alignment_to_mutations(v_alignment, self.mutations):
-            h = combination_hash(read_mutations, self.mutations_ind[gene])
-            if h not in self.mut_combinations[gene]:
+        for _, segment, read_mismatches in utilities.v_alignment_to_mismatches(v_alignment, self.mismatches):
+            h = combination_hash(read_mismatches, self.mismatches_ind[segment])
+            if h not in self.mut_combinations[segment]:
                 continue
 
-            self.mut_combinations[gene][h].datasets[name] += 1
+            self.mut_combinations[segment][h].datasets[name] += 1
 
 
-def load_j_gene(cdr_details):
+def load_j_segment(cdr_details):
     j_hit = dict()
     for line in cdr_details:
-        read_name, j_gene = line.strip().split('\t')
-        j_hit[read_name] = j_gene
+        read_name, j_segment = line.strip().split('\t')
+        j_hit[read_name] = j_segment
     return j_hit
 
 
@@ -136,23 +136,23 @@ def validate(mut_combinations, validation_f, my_v_alignment):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='suspicious mutation combinations', add_help=False)
+    parser = argparse.ArgumentParser(description='suspicious mismatch combinations', add_help=False)
     input_files = parser.add_argument_group('input files')
     input_files.add_argument('-v', '--v-alignment', help='v_alignment.csv', dest='v_alignment',
-                             type=argparse.FileType('r'), required=True, metavar='V')
-    input_files.add_argument('-j', '--j-hit', help='file with lines <read name> <j gene>',
-                             dest='j_hit', type=argparse.FileType('r'), required=True, metavar='J')
-    input_files.add_argument('-m', '--mutations', help='potential_mutations.csv',
-                             type=argparse.FileType('r'), required=True, metavar='M')
+                             type=argparse.FileType('r'), required=True, metavar='FILE')
+    input_files.add_argument('-j', '--j-hit', help='file with lines <read name> <j segment>',
+                             dest='j_hit', type=argparse.FileType('r'), required=True, metavar='FILE')
+    input_files.add_argument('-m', '--mismatches', help='potential_mismatches.csv',
+                             type=argparse.FileType('r'), required=True, metavar='FILE')
     input_files.add_argument('-d', '--datasets', type=argparse.FileType('r'),
                              help='file with lines <name> <v_alignment.csv> '
-                                  'for the validation (optional)', metavar='D')
+                                  'for the validation (optional)', metavar='FILE')
 
     output_files = parser.add_argument_group('output files')
     output_files.add_argument('-o', '--output', help='csv combinations output',
-                              type=argparse.FileType('w'), required=True, metavar='O')
+                              type=argparse.FileType('w'), required=True, metavar='FILE')
     output_files.add_argument('-u', '--human', help='human readable combinations output (optional)',
-                              type=argparse.FileType('w'), metavar='H')
+                              type=argparse.FileType('w'), metavar='FILE')
 
     optional = parser.add_argument_group('optional arguments')
     optional.add_argument('--length', help='min combination length (default: 2)',
@@ -167,9 +167,9 @@ def main():
 
     args = parser.parse_args()
 
-    mutations = potential_mutations.load_potential_mutations(args.mutations)
-    j_hit = load_j_gene(args.j_hit)
-    mut_combinations = Combinations(args.v_alignment, mutations, j_hit)
+    mismatches = potential_mismatches.load_potential_mismatches(args.mismatches)
+    j_hit = load_j_segment(args.j_hit)
+    mut_combinations = Combinations(args.v_alignment, mismatches, j_hit)
 
     if args.datasets:
         validate(mut_combinations, args.datasets, args.v_alignment.name)

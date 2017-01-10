@@ -10,7 +10,7 @@ def random_combination(args, gene, length, generated):
         positions = sorted(random.sample(range(args.range[0], args.range[1] + 1), length))
         nts = [random.choice('ACGT') for _ in range(length)]
         comb = ','.join('%d:%s' % x for x in zip(positions, nts))
-    
+
         if (gene, comb) not in generated:
             generated.add((gene, comb))
             return comb
@@ -31,7 +31,7 @@ def shuffle_combinations(args):
         line = line.strip().split('\t')
         gene = line[0]
         length = int(line[2])
-        outp.write('%s\t*\t%d\t%s\t*\t*\n' % (gene, length, random_combination(args, gene, length, generated)))
+        outp.write('%s\t0\t%d\t%s\t*\t*\n' % (gene, length, random_combination(args, gene, length, generated)))
 
 
 def main():
@@ -47,4 +47,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

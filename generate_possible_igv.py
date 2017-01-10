@@ -10,8 +10,7 @@ from extra import nt_string
 def read_igv(igv, outp=None):
     genes = dict()
     for gene in nt_string.read_fasta(igv):
-        gene.name = re.match(r'.*(IG[^| ]*).*', gene.name).group(1)
-        gene.seq = gene.seq.upper()
+        gene.name = gene.name.lstrip('>')
         genes[gene.name] = gene
 
         if outp:
@@ -21,12 +20,12 @@ def read_igv(igv, outp=None):
     return genes
 
 
-def generate_novel_segment(gene, combination):
+def generate_novel_segment(gene_seq, combination):
     mutations = [(int(position), nt) for position, nt in
                  [mutation.split(':') for mutation in combination.split(',')]]
     mutations.sort(key=itemgetter(0))
 
-    new_seq = list(gene.seq)
+    new_seq = list(gene_seq)
     for position, nt in mutations:
         new_seq[position - 1] = nt
     return ''.join(new_seq)
@@ -34,7 +33,7 @@ def generate_novel_segment(gene, combination):
 
 def generate_and_write(gene, combination, i, outp):
     outp.write('>%s-M%d\n' % (gene.name, i))
-    new_seq = generate_novel_segment(gene, combinations)
+    new_seq = generate_novel_segment(gene.seq, combinations)
     for i in range(0, len(new_seq), 80):
         outp.write('%s\n' % new_seq[i:i + 80])
 

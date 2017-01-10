@@ -10,16 +10,17 @@ def compare(seq1, seq2, pos_range):
     l2 = len(seq2)
     min_l = min(l1, l2)
     max_l = max(l1, l2)
-    
-    l, r = pos_range
-    if min_l <= l:
-        return r - l + 1
 
-    s = sum(seq1[i] != seq2[i] for i in range(l, min(min_l, r + 1)))
+    l, r = pos_range
+    l -= 1
+    if min_l <= l:
+        return r - l
+
+    s = sum(seq1[i] != seq2[i] for i in range(l, min(min_l, r)))
     if l1 <= l2:
         return s
     else:
-        return s + min(r + 1, l1) - min(r + 1, l2)
+        return s + min(r, l1) - min(r, l2)
 
 
 def find_nearest(seq, source, pos_range):
@@ -61,4 +62,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

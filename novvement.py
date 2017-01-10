@@ -7,6 +7,11 @@ import io
 import subprocess
 
 
+def rc_fail():
+    sys.stderr.write('\nNon-empty return code\n')
+    exit(1)
+
+
 def mkdir(path):
     try:
         os.mkdir(path)
@@ -50,6 +55,8 @@ def segment_coverage(args, log, datasets):
             p2.stdout.close()
             p3.stdout.close()
             p4.communicate()
+            if p4.returncode:
+                rc_fail()
 
 
 def j_hits(args, log, datasets):
@@ -62,6 +69,8 @@ def j_hits(args, log, datasets):
             log.write("\tcat %s | cut -f1,9 > %s\n" % (inp.name, outp.name))
             p1 = subprocess.Popen(['cut', '-f1,9'], stdin=inp, stdout=outp)
             p1.communicate()
+            if p1.returncode:
+                rc_fail()
 
 
 def v_alignment(args, log, datasets):
@@ -77,7 +86,8 @@ def v_alignment(args, log, datasets):
                    '-i', os.path.join(path, 'v_alignments.fa'),
                    '-o', os.path.join(dir, name, 'alignment', 'v_alignment.csv')]
         log.write('\t%s\n' % ' '.join(command))
-        subprocess.run(command)
+        if subprocess.run(command).returncode:
+            rc_fail()
 
     sys.stdout.write('\n')
 
@@ -94,14 +104,15 @@ def potential_mismatches(args, log, datasets):
         sys.stdout.flush()
         command = [os.path.join(script_path, 'potential_mismatches.py'),
                    '-v', os.path.join(dir, name, 'alignment', 'v_alignment.csv'),
-                   '-g', os.path.join(dir, name, 'alignment', 'segment_coverage.csv'),
+                   '-s', os.path.join(dir, name, 'alignment', 'segment_coverage.csv'),
                    '-o', os.path.join(dir, name, 'combinations_a', 'potential_mismatches.csv'),
                    '--range', args.range[0], args.range[1],
                    '--coverage', args.segment_coverage,
                    '--rate', args.mismatch_rate]
         command = [str(x) for x in command]
         log.write('\t%s\n' % ' '.join(command))
-        subprocess.run(command)
+        if subprocess.run(command).returncode:
+            rc_fail()
 
     sys.stdout.write('\n')
 
@@ -130,7 +141,8 @@ def combinations(args, log, datasets, comb_dir):
 
         command = [str(x) for x in command]
         log.write('\t%s\n' % ' '.join(command))
-        subprocess.run(command)
+        if subprocess.run(command).returncode:
+            rc_fail()
 
     sys.stdout.write('\n')
 
@@ -156,7 +168,8 @@ def expand_mismatches(args, log, datasets):
                    '--rate', args.expansion_rate]
         command = [str(x) for x in command]
         log.write('\t%s\n' % ' '.join(command))
-        subprocess.run(command)
+        if subprocess.run(command).returncode:
+            rc_fail()
 
     sys.stdout.write('\n')
 
@@ -187,22 +200,25 @@ def significance(args, log, datasets):
         log.write('\tcat %s | cut -f2- > %s\n' % (inp.name, outp.name))
         p1 = subprocess.Popen(['cut', '-f2-'], stdin=inp, stdout=outp)
         p1.communicate()
+        if p1.returncode:
+            rc_fail()
 
 
 def generate(args, log, datasets):
     dir = args.output
     script_path = os.path.dirname(__file__)
 
-    sys.stdout.write('segmentrating novel segments\n')
-    log.write('\n# segmentrating novel segments\n')
+    sys.stdout.write('Generating novel segments\n')
+    log.write('\n# Generating novel segments\n')
 
-    command = [os.path.join(script_path, 'generate_possible_igv.py'),
+    command = [os.path.join(script_path, 'combinations_to_segments.py'),
                '-c', os.path.join(dir, 'combinations.csv'),
-               '-i', args.v_segments,
+               '-v', args.v_segments,
                '-o', os.path.join(dir, 'segments.fa')]
     command = [str(x) for x in command]
     log.write('\t%s\n' % ' '.join(command))
-    subprocess.run(command)
+    if subprocess.run(command).returncode:
+        rc_fail()
 
     sys.stdout.write('Segments generated ::::: %s\n' % os.path.join(dir, 'segments.fa'))
 
@@ -277,10 +293,10 @@ def main():
                           type=float, default=0.9, metavar='FLOAT', dest='expansion_rate')
     human_args += [('Combination expansion', None), ('Combination coverage', 'comb_coverage'), ('Expansion rate', 'expansion_rate')]
 
-    gen_args = parser.add_argument_group('segments segmentration arguments')
+    gen_args = parser.add_argument_group('segments generation arguments')
     gen_args.add_argument('--min-significance', help='min significance (default: 20)',
                           type=int, metavar='INT', default=20, dest='min_significance')
-    human_args += [('Segments segmentration', None), ('Min significance', 'min_significance')]
+    human_args += [('Segments generation', None), ('Min significance', 'min_significance')]
 
     other = parser.add_argument_group('other arguments')
     other.add_argument('-h', '--help', action='help', help='show this help message and exit')

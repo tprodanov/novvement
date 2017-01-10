@@ -31,7 +31,7 @@ def analyze_v_alignment(inp, outp):
                         outp.write('%s\t%s\tinsert\t%d\t%s\n' % (segment_name, read_name, j, seq1[i]))
                         j -= 1
                     elif seq1[i] == 'N' or seq2[i] == 'N':
-                        outp.write('%s\t%s\degenerate\t%d\t%s\n' % (segment_name, read_name, j, seq1[i]))
+                        outp.write('%s\t%s\tdegenerate\t%d\t%s\n' % (segment_name, read_name, j, seq1[i]))
                     else:
                         outp.write('%s\t%s\tmismatch\t%d\t%s\n' % (segment_name, read_name, j, seq1[i]))
                 j += 1

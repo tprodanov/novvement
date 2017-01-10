@@ -4,7 +4,7 @@ import argparse
 import sys
 import itertools
 
-import generate_possible_igv
+import combinations_to_segments
 
 
 def distance(seq1, seq2):
@@ -49,7 +49,7 @@ def keep(name, seq, significance, source, target, args):
 
 
 def run(args):
-    segments = generate_possible_igv.read_igv(args.v_segments)
+    segments = combinations_to_segments.read_igv(args.v_segments)
     inp = args.combinations
     outp = args.output
     l, r = args.range
@@ -69,7 +69,7 @@ def run(args):
         segment = split_line[0]
         significance = int(split_line[1])
         combination = split_line[3]
-        seq = generate_possible_igv.generate_novel_segment(segments[segment].seq, combination)[l:r]
+        seq = combinations_to_segments.generate_novel_segment(segments[segment].seq, combination)[l:r]
 
         name = '%s-M%d' % (segment, i + 1)
 

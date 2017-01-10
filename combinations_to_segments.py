@@ -7,9 +7,9 @@ from collections import defaultdict
 from extra import nt_string
 
 
-def read_segments(segments, outp=None):
+def read_segments(inp, outp=None):
     segments = dict()
-    for segment in nt_string.read_fasta(segments):
+    for segment in nt_string.read_fasta(inp):
         segment.name = segment.name.lstrip('>')
         segments[segment.name] = segment
 
@@ -33,7 +33,7 @@ def generate_novel_segment(segment_seq, combination):
 
 def generate_and_write(segment, combination, i, outp):
     outp.write('>%s-M%d\n' % (segment.name, i))
-    new_seq = generate_novel_segment(segment.seq, combinations)
+    new_seq = generate_novel_segment(segment.seq, combination)
     for i in range(0, len(new_seq), 80):
         outp.write('%s\n' % new_seq[i:i + 80])
 
@@ -64,7 +64,7 @@ def main():
     args = parser.parse_args()
 
     segments = read_segments(args.v_segments, None if args.discard_original else args.output)
-    generate(segments, args.combinations, args.output, segment_combinations)
+    generate(segments, args.combinations, args.output)
 
 
 if __name__ == '__main__':

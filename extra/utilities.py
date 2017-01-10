@@ -18,7 +18,7 @@ def v_alignment_to_mismatches(v_alignment, potential_mismatches):
     prev_read = None
 
     for line in v_alignment:
-        , read, mut_type, position, nt = line.strip().split()
+        segment, read, mut_type, position, nt = line.strip().split()
         position = int(position)
 
         if segment not in potential_mismatches:

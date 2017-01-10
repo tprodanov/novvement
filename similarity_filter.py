@@ -49,7 +49,7 @@ def keep(name, seq, significance, source, target, args):
 
 
 def run(args):
-    segments = combinations_to_segments.read_igv(args.v_segments)
+    segments = combinations_to_segments.read_segments(args.v_segments)
     inp = args.combinations
     outp = args.output
     l, r = args.range

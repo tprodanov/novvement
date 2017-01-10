@@ -214,18 +214,16 @@ def filter_combinations(args, log, datasets):
     command = [os.path.join(script_path, 'similarity_filter.py'),
                '-c', os.path.join(dir, 'combinations.csv'),
                '-v', args.v_segments,
-               '-o', os.path.join(dir, 'f_combinations.csv')
+               '-o', os.path.join(dir, 'f_combinations.csv'),
                '-l', os.path.join(dir, 'filter.log'),
                '--range', args.range[0], args.range[1],
-               '--source-dist', args.source_dist if args.source_dist else args.length,
+               '--source-dist', args.source_dist,
                '--target-dist', args.target_dist,
                '--target-mf', args.target_mf]
     command = [str(x) for x in command]
     log.write('\t%s\n' % ' '.join(command))
     if subprocess.run(command).returncode:
         rc_fail()
-
-    sys.stdout.write('Segments generated ::::: %s\n' % os.path.join(dir, 'segments.fa'))
 
 
 def generate(args, log, datasets):
@@ -335,7 +333,7 @@ def main():
                              metavar='FLOAT', dest='target_mf', type=float, default=4)
     human_args += [('Segments filtering', None), ('Min significance', 'min_significance'),
                    ('Distance to source', 'source_dist'), ('Distance to target', 'target_dist'),
-                   ('Significance multiplication factor', 'target-mf')]
+                   ('Significance multiplication factor', 'target_mf')]
 
     other = parser.add_argument_group('other arguments')
     other.add_argument('-h', '--help', action='help', help='show this help message and exit')
@@ -343,6 +341,8 @@ def main():
                        version='novVement 0.1.0 ::: Created by Timofey Prodanov (timofey.prodanov@gmail.com)')
 
     args = parser.parse_args()
+    if not args.source_dist:
+        args.source_dist = args.length
 
     try:
         run(args, human_args)

@@ -5,6 +5,7 @@ import os
 import sys
 import io
 import subprocess
+from _version import __version__
 
 
 def rc_fail():
@@ -30,6 +31,7 @@ def log_header(log, args, human_args):
             v = args[v]
             log.write('#\t\t%s: %s\n' % (k, v.name if isinstance(v, io.IOBase) else v))
     log.write('\n')
+    log.flush()
 
 
 def make_datasets_file(dir, log, datasets):
@@ -41,8 +43,8 @@ def make_datasets_file(dir, log, datasets):
 
 def segment_coverage(args, log, datasets):
     dir = args.output
-    sys.stdout.write('segment coverage\n')
-    log.write('\n# segment coverage\n')
+    sys.stdout.write('Segment coverage\n')
+    log.write('\n# Segment coverage\n')
 
     for name, path in datasets:
         with open(os.path.join(path, 'alignment_info.csv')) as inp, open(os.path.join(dir, name, 'alignment', 'segment_coverage.csv'), 'w') as outp:
@@ -234,7 +236,7 @@ def generate(args, log, datasets):
     log.write('\n# Generating novel segments\n')
 
     command = [os.path.join(script_path, 'combinations_to_segments.py'),
-               '-c', os.path.join(dir, 'combinations.csv'),
+               '-c', os.path.join(dir, 'f_combinations.csv'),
                '-v', args.v_segments,
                '-o', os.path.join(dir, 'segments.fa')]
     command = [str(x) for x in command]
@@ -276,13 +278,13 @@ def run(args, human_args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='pipeline for detecting novel segments. '
+    parser = argparse.ArgumentParser(description='Pipeline for detecting novel segments.\n'
                                                  'Created by Timofey Prodanov (timofey.prodanov@gmail.com)',
                                      usage='%(prog)s -i DATASETS -v V_SEGMENTS -o OUT_DIR',
-                                     add_help=False)
-    io_args = parser.add_argument_group('inpur/output arguments')
+                                     add_help=False, formatter_class=argparse.RawTextHelpFormatter)
+    io_args = parser.add_argument_group('Inpur/output arguments')
     io_args.add_argument('-i', '--input', required=True, metavar='FILE', type=argparse.FileType(),
-                         help='file with lines <name> <path to cdr folder>.'
+                         help='file with lines <name> <path to cdr folder>.\n'
                               'Should contain: v_alignments.fa, alignment_info.csv')
     io_args.add_argument('-v', '--v-segments', required=True, metavar='FILE', help='file containing V segments',
                          dest='v_segments')
@@ -290,16 +292,16 @@ def main():
     io_args.add_argument('-f', '--force', help='override files in output directory', action='store_true')
     human_args = [('Input/output', None), ('Input', 'input'), ('V segments', 'v_segments'), ('Output', 'output'), ('Force', 'force')]
 
-    mismatch_args = parser.add_argument_group('mismatch detection arguments')
+    mismatch_args = parser.add_argument_group('Mismatch detection arguments')
     mismatch_args.add_argument('--range', help='positions range (default: [60, 290])',
                                metavar=('INT', 'INT'), nargs=2, default=[60, 290], type=int)
     mismatch_args.add_argument('--segment-coverage', help='segment coverage threshold (default: 200)',
                                type=int, default=200, metavar='INT', dest='segment_coverage')
     mismatch_args.add_argument('--mismatch-rate', help='mismatch rate threshold (default: 0.1)',
                                type=float, default=0.1, metavar='FLOAT', dest='mismatch_rate')
-    human_args += [('mismatch detection', None), ('Range', 'range'), ('segment coverage', 'segment_coverage'), ('Mismatch rate', 'mismatch_rate')]
+    human_args += [('mismatch detection', None), ('Range', 'range'), ('Segment coverage', 'segment_coverage'), ('Mismatch rate', 'mismatch_rate')]
 
-    comb_args = parser.add_argument_group('combination detection arguments')
+    comb_args = parser.add_argument_group('Combination detection arguments')
     comb_args.add_argument('--length', help='min combination length (default: 2)',
                            type=int, default=2, metavar='INT')
     comb_args.add_argument('--cov-single-j', help='min coverage with the single J hit (default: 15)',
@@ -311,34 +313,34 @@ def main():
     human_args += [('Combination detection', None), ('Length', 'length'), ('Coverage w/ single J hit', 'cov_single_j'),
                    ('Coverage w/ multiple J hits', 'cov_mult_j'), ('Human readable', 'human_readable')]
 
-    exp_args = parser.add_argument_group('combination expansion arguments')
+    exp_args = parser.add_argument_group('Combination expansion arguments')
     exp_args.add_argument('--comb-coverage', help='combination coverage threshold (default: 50)',
                           type=int, default=50, metavar='INT', dest='comb_coverage')
-    exp_args.add_argument('--expansion-rate', help='mismatch coverage threshold (ratio to combination coverage) (default: 0.9)',
+    exp_args.add_argument('--expansion-rate', help='mismatch coverage threshold (ratio\nto combination coverage) (default: 0.9)',
                           type=float, default=0.9, metavar='FLOAT', dest='expansion_rate')
     human_args += [('Combination expansion', None), ('Combination coverage', 'comb_coverage'), ('Expansion rate', 'expansion_rate')]
 
-    filter_args = parser.add_argument_group('segments filtering arguments')
+    filter_args = parser.add_argument_group('Segments filtering arguments')
     filter_args.add_argument('--min-significance', help='min significance (default: 20)',
                              type=int, metavar='INT', default=20, dest='min_significance')
-    filter_args.add_argument('--source-dist', help='minimum required distance to '
+    filter_args.add_argument('--source-dist', help='minimum required distance to\n'
                                                    'any source segment (default: --length)',
                              metavar='INT', dest='source_dist', type=int)
-    filter_args.add_argument('--target-dist', help='minimum reliable distance to '
+    filter_args.add_argument('--target-dist', help='minimum reliable distance to\n'
                                                    'any target combination (default: 3)',
                              metavar='INT', dest='target_dist', type=int, default=3)
-    filter_args.add_argument('--target-mf', help='significance multiplication factor '
-                                                 'to filter out combination with unreliable '
+    filter_args.add_argument('--target-mf', help='significance multiplication factor\n'
+                                                 'to filter out combination with unreliable\n'
                                                  'target distance (default: 4)',
                              metavar='FLOAT', dest='target_mf', type=float, default=4)
     human_args += [('Segments filtering', None), ('Min significance', 'min_significance'),
                    ('Distance to source', 'source_dist'), ('Distance to target', 'target_dist'),
                    ('Significance multiplication factor', 'target_mf')]
 
-    other = parser.add_argument_group('other arguments')
+    other = parser.add_argument_group('Other arguments')
     other.add_argument('-h', '--help', action='help', help='show this help message and exit')
     other.add_argument('--version', action='version', help='show version',
-                       version='novVement 0.1.0 ::: Created by Timofey Prodanov (timofey.prodanov@gmail.com)')
+                       version=__version__)
 
     args = parser.parse_args()
     if not args.source_dist:

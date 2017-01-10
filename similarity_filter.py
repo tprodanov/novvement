@@ -22,7 +22,7 @@ def min_distance(seq, source):
         if dist is None or d < dist:
             dist = d
             nearest = entry[1:]
-    return (dist, *nearest) if dist is not None else (None, )
+    return (dist, *nearest) if dist is not None else None
 
 
 def keep(name, seq, significance, source, target, args):
@@ -39,6 +39,9 @@ def keep(name, seq, significance, source, target, args):
         return True
 
     dist, nearest_significance, oth = min_distance(seq, target)
+    if dist == 0:
+        args.log.write('%s is equal to %s\n' % (name, oth))
+        return False
     if dist >= args.target_dist:
         return True
     if significance * args.target_mf < nearest_significance:

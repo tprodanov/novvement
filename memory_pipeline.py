@@ -25,6 +25,7 @@ def log_header(log, args, human_args):
             v = args[v]
             log.write('#\t\t%s: %s\n' % (k, v.name if isinstance(v, io.IOBase) else v))
     log.write('\n')
+    log.flush()
 
 
 def load_datasets(f, log):

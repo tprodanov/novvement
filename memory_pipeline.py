@@ -4,7 +4,13 @@ import argparse
 import sys
 import os
 import subprocess
+import io
 from operator import itemgetter
+
+
+def rc_fail():
+    sys.stderr.write('\nNon-empty return code\n')
+    exit(1)
 
 
 def mkdir(path):
@@ -77,8 +83,10 @@ def validate(args, datasets, log):
                        '--neigh-overhead', args.neigh_overhead,
                        '--neigh-good', args.neigh_good,
                        '--neigh-bad', args.neigh_bad]
+            command = list(map(str, command))
             log.write('\t%s\n' % ' '.join(command))
-            subprocess.run(command)
+            if subprocess.run(command).returncode:
+                rc_fail()
         sys.stdout.write('\n')
     log.write('\n')
 
@@ -105,12 +113,15 @@ def combined_validate(args, datasets, log):
                    '--neigh-overhead', args.neigh_overhead,
                    '--neigh-good', args.neigh_good,
                    '--neigh-bad', args.neigh_bad]
+        command = list(map(str, command))
         log.write('\t%s | %s\n' % (' '.join(cat_command), ' ' .join(command)))
 
         p1 = subprocess.Popen(cat_command, stdout=subprocess.PIPE)
         p2 = subprocess.Popen(command, stdin=p1.stdout)
         p1.stdout.close()
         p2.communicate()
+        if p2.returncode:
+            rc_fail()
     sys.stdout.write('\n')
     log.write('\n')
 
@@ -136,6 +147,8 @@ def combine_segments_summary(args, datasets, log):
         p2 = subprocess.Popen(command2, stdin=p1.stdout, stdout=outp)
         p1.stdout.close()
         p2.communicate()
+        if p2.returncode:
+            rc_fail()
 
         for individual, ind_datasets in datasets:
             tail_command(os.path.join(dir, individual, target), log, outp)
@@ -143,7 +156,7 @@ def combine_segments_summary(args, datasets, log):
                 tail_command(os.path.join(dir, individual, name, target), log, outp)
 
 
-def run(args):
+def run(args, human_args):
     dir = args.output
     mkdir(dir)
     if not args.force and os.listdir(dir):
@@ -151,7 +164,7 @@ def run(args):
         exit(1)
 
     with open(os.path.join(dir, 'log.txt'), 'w') as log:
-        log_header(log, args)
+        log_header(log, args, human_args)
 
         datasets = load_datasets(args.datasets, log)
         for individual, ind_datasets in datasets:
@@ -186,13 +199,13 @@ def main():
                           metavar='INT', default=3, type=int)
     val_args.add_argument('--neigh-overhead', help='acceptable mismatch rate overhead '
                                                    'in the position neighborhood (default: 1.1)',
-                          metavar='FLOAT', default=1.1, type=float, dest=neigh_overhead)
+                          metavar='FLOAT', default=1.1, type=float, dest='neigh_overhead')
     val_args.add_argument('--neigh-good', help='position is treated good, if its mismatch rate is less '
                                                'than --neigh-good (default: 0.2)',
-                          metavar='FLOAT', default=0.2, type=float, dest=neigh_good)
+                          metavar='FLOAT', default=0.2, type=float, dest='neigh_good')
     val_args.add_argument('--neigh-bad', help='position is treated good, if its mismatch rate is more '
                                                'than --neigh-bad (default: 0.8)',
-                          metavar='FLOAT', default=0.8, type=float, dest=neigh_good)
+                          metavar='FLOAT', default=0.8, type=float, dest='neigh_bad')
     human_args += [('Validation arguments', None), ('Range', 'range'), ('neighborhood size', 'neigh'),
                    ('Neighborhood overhead', 'neigh_overhead'), ('Neighborhood: good', 'neigh_good'),
                    ('Neighborhood: bad', 'neigh_bad')]
@@ -202,7 +215,7 @@ def main():
     args = parser.parse_args()
 
     try:
-        run(args)
+        run(args, human_args)
     except KeyboardInterrupt:
         sys.stderr.write('\nKeyboard Interrupt\n')
         exit(1)

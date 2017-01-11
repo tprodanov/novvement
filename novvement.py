@@ -5,6 +5,7 @@ import os
 import sys
 import io
 import subprocess
+import time
 from _version import __version__
 
 
@@ -198,7 +199,7 @@ def significance(args, log, datasets):
     subprocess.run(command)
 
     log.write('\n# Significance -> Combinations\n')
-    with open(os.path.join(dir, 'significance.csv')) as inp, open(os.path.join(dir, 'combinations.csv'), 'w') as outp:
+    with open(os.path.join(dir, 'significance.csv')) as inp, open(os.path.join(dir, 'pre_combinations.csv'), 'w') as outp:
         log.write('\tcat %s | cut -f2- > %s\n' % (inp.name, outp.name))
         p1 = subprocess.Popen(['cut', '-f2-'], stdin=inp, stdout=outp)
         p1.communicate()
@@ -214,9 +215,9 @@ def filter_combinations(args, log, datasets):
     log.write('\n# Filter combinations\n')
 
     command = [os.path.join(script_path, 'similarity_filter.py'),
-               '-c', os.path.join(dir, 'combinations.csv'),
+               '-c', os.path.join(dir, 'pre_combinations.csv'),
                '-v', args.v_segments,
-               '-o', os.path.join(dir, 'f_combinations.csv'),
+               '-o', os.path.join(dir, 'combinations.csv'),
                '-l', os.path.join(dir, 'filter.log'),
                '--range', args.range[0], args.range[1],
                '--source-dist', args.source_dist,
@@ -236,7 +237,7 @@ def generate(args, log, datasets):
     log.write('\n# Generating novel segments\n')
 
     command = [os.path.join(script_path, 'combinations_to_segments.py'),
-               '-c', os.path.join(dir, 'f_combinations.csv'),
+               '-c', os.path.join(dir, 'combinations.csv'),
                '-v', args.v_segments,
                '-o', os.path.join(dir, 'segments.fa')]
     command = [str(x) for x in command]
@@ -247,7 +248,15 @@ def generate(args, log, datasets):
     sys.stdout.write('Segments generated ::::: %s\n' % os.path.join(dir, 'segments.fa'))
 
 
+def time_to_str(seconds):
+    h = seconds // 3600
+    m = (seconds % 3600) // 60
+    s = seconds % 60
+    return ('%d:' % h if h else '') + '%d:%d' % (m, s) 
+
+
 def run(args, human_args):
+    start = time.perf_counter()
     dir = args.output
     mkdir(args.output)
     if not args.force and os.listdir(dir):
@@ -275,6 +284,11 @@ def run(args, human_args):
         significance(args, log, datasets)
         filter_combinations(args, log, datasets)
         generate(args, log, datasets)
+
+        seconds = time.perf_counter() - start
+        t = time_to_str(seconds)
+        sys.stdout.write('Execution time: %s\n' % t)
+        log.write('\n# Execution time: %s\n' % t)
 
 
 def main():

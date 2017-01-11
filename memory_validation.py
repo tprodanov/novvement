@@ -226,13 +226,13 @@ def main():
                           metavar='INT', default=3, type=int)
     val_args.add_argument('--neigh-overhead', help='acceptable mismatch rate overhead '
                                                    'in the position neighborhood (default: 1.1)',
-                          metavar='FLOAT', default=1.1, type=float, dest=neigh_overhead)
+                          metavar='FLOAT', default=1.1, type=float, dest='neigh_overhead')
     val_args.add_argument('--neigh-good', help='position is treated good, if its mismatch rate is less '
                                                'than --neigh-good (default: 0.2)',
-                          metavar='FLOAT', default=0.2, type=float, dest=neigh_good)
+                          metavar='FLOAT', default=0.2, type=float, dest='neigh_good')
     val_args.add_argument('--neigh-bad', help='position is treated good, if its mismatch rate is more '
                                                'than --neigh-bad (default: 0.8)',
-                          metavar='FLOAT', default=0.8, type=float, dest=neigh_good)
+                          metavar='FLOAT', default=0.8, type=float, dest='neigh_bad')
 
     other = parser.add_argument_group('other arguments')
     other.add_argument('-h', '--help', action='help', help='show this help message and exit')

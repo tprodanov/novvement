@@ -4,11 +4,13 @@ import argparse
 from collections import Counter
 from collections import defaultdict
 from operator import itemgetter
-from extra import utilities
-import potential_mismatches
 import os
 import re
 import sys
+
+from extra import utilities
+from _version import __version__
+import potential_mismatches
 
 
 def index_mismatches(mismatches):
@@ -136,34 +138,37 @@ def validate(mut_combinations, validation_f, my_v_alignment):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='suspicious mismatch combinations', add_help=False)
-    input_files = parser.add_argument_group('input files')
-    input_files.add_argument('-v', '--v-alignment', help='v_alignment.csv', dest='v_alignment',
-                             type=argparse.FileType('r'), required=True, metavar='FILE')
-    input_files.add_argument('-j', '--j-hit', help='file with lines <read name> <j segment>',
-                             dest='j_hit', type=argparse.FileType('r'), required=True, metavar='FILE')
-    input_files.add_argument('-m', '--mismatches', help='potential_mismatches.csv',
-                             type=argparse.FileType('r'), required=True, metavar='FILE')
+    parser = argparse.ArgumentParser(description='Combine potential mismatches into combinations',
+                                     formatter_class=argparse.RawTextHelpFormatter, add_help=False,
+                                     usage='%(prog)s -v File -j File -m File [-d File] -o File [-u File] [args]')
+    input_files = parser.add_argument_group('Input files')
+    input_files.add_argument('-v', '--v-alignment', help='Csv file containig V alignment', dest='v_alignment',
+                             type=argparse.FileType('r'), required=True, metavar='File')
+    input_files.add_argument('-j', '--j-hit', help='File with lines <read name> <j segment>',
+                             dest='j_hit', type=argparse.FileType('r'), required=True, metavar='File')
+    input_files.add_argument('-m', '--mismatches', help='Csv file contating potential mismatches',
+                             type=argparse.FileType('r'), required=True, metavar='File')
     input_files.add_argument('-d', '--datasets', type=argparse.FileType('r'),
-                             help='file with lines <name> <v_alignment.csv> '
-                                  'for the validation (optional)', metavar='FILE')
+                             help='File with lines <name> <v_alignment.csv>\n'
+                                  'for the validation (optional)', metavar='File')
 
-    output_files = parser.add_argument_group('output files')
-    output_files.add_argument('-o', '--output', help='csv combinations output',
-                              type=argparse.FileType('w'), required=True, metavar='FILE')
-    output_files.add_argument('-u', '--human', help='human readable combinations output (optional)',
-                              type=argparse.FileType('w'), metavar='FILE')
+    output_files = parser.add_argument_group('Output files')
+    output_files.add_argument('-o', '--output', help='Csv combinations output',
+                              type=argparse.FileType('w'), required=True, metavar='File')
+    output_files.add_argument('-u', '--human', help='Human readable combinations output (optional)',
+                              type=argparse.FileType('w'), metavar='File')
 
-    optional = parser.add_argument_group('optional arguments')
-    optional.add_argument('--length', help='min combination length (default: 2)',
-                          default=2, type=int, metavar='INT')
-    optional.add_argument('--cov-single-j', help='min coverage with the single J hit (default: 15)',
-                          default=15, type=int, metavar='INT', dest='cov1')
-    optional.add_argument('--cov-mult-j', help='min coverage with multiple J hits (default: 5)',
-                          default=5, type=int, metavar='INT', dest='cov')
+    optional = parser.add_argument_group('Optional arguments')
+    optional.add_argument('--length', help='Min combination length (default: 2)',
+                          default=2, type=int, metavar='Int')
+    optional.add_argument('--cov-single-j', help='Min coverage with the single J hit (default: 15)',
+                          default=15, type=int, metavar='Int', dest='cov1')
+    optional.add_argument('--cov-mult-j', help='Min coverage with multiple J hits (default: 5)',
+                          default=5, type=int, metavar='Int', dest='cov')
 
-    other = parser.add_argument_group('other arguments')
-    other.add_argument('-h', '--help', action='help', help='show this help message and exit')
+    other = parser.add_argument_group('Other arguments')
+    other.add_argument('-h', '--help', action='help', help='Show this help message and exit')
+    other.add_argument('--version', action='version', help='Show version', version=__version__)
 
     args = parser.parse_args()
 

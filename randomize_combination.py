@@ -6,6 +6,7 @@ import random
 
 import similarity_filter
 import combinations_to_segments
+from _version import __version__
 
 def random_combination(l, r, segment_seq, length, min_dist, source):
     while True:
@@ -44,19 +45,27 @@ def randomize_combinations(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='generate random combinations')
-    parser.add_argument('-i', '--input', help='input combinations csv file', type=argparse.FileType(),
-                        metavar='FILE', required=True)
-    parser.add_argument('-v', '--v-segments', help='V segments fasta', type=argparse.FileType(),
-                        metavar='FILE', required=True, dest='v_segments')
-    parser.add_argument('-o', '--output', help='output combinations csv file', type=argparse.FileType('w'),
-                        metavar='FILE', required=True)
-    parser.add_argument('--range', help='positions range (default: [60, 290])', metavar=('INT', 'INT'),
-                        nargs=2, default=[60, 290], type=int)
-    parser.add_argument('--min-dist', help='min distance from any V segment (default: 2)',
-                        type=int, metavar='INT', default=2, dest='min_dist')
-    args = parser.parse_args()
+    parser = argparse.ArgumentParser(description='Randomize combinations',
+                                     formatter_class=argparse.RawTextHelpFormatter, add_help=False)
+    io_args = parser.add_argument_group('Input/output files')
+    io_args.add_argument('-i', '--input', help='Input combinations csv file', type=argparse.FileType(),
+                         metavar='File', required=True)
+    io_args.add_argument('-v', '--v-segments', help='V segments fasta', type=argparse.FileType(),
+                         metavar='File', required=True, dest='v_segments')
+    io_args.add_argument('-o', '--output', help='Output combinations csv file', type=argparse.FileType('w'),
+                         metavar='File', required=True)
 
+    opt_args = parser.add_argument_group('Optional arguments')
+    opt_args.add_argument('--range', help='Positions range (default: [60, 290])', metavar=('Int', 'Int'),
+                          nargs=2, default=[60, 290], type=int)
+    opt_args.add_argument('--min-dist', help='Min distance from any V segment (default: 2)',
+                          type=int, metavar='Int', default=2, dest='min_dist')
+
+    other = parser.add_argument_group('Other arguments')
+    other.add_argument('-h', '--help', action='help', help='Show this help message and exit')
+    other.add_argument('--version', action='version', help='Show version', version=__version__)
+
+    args = parser.parse_args()
     randomize_combinations(args)
 
 

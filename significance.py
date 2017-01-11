@@ -5,6 +5,7 @@ from operator import itemgetter
 from os import path
 import sys
 
+from _version import __version__
 
 class Combination:
     def __init__(self, line, name):
@@ -71,15 +72,23 @@ def write_combinations(combinations_list, min_significance, keep_duplicates, out
 
 
 def main():
-    parser = argparse.ArgumentParser(description='sort combinations by significance')
-    parser.add_argument('-i', '--input', help='input file with lines <name> <combinations.csv path>',
-                        type=argparse.FileType('r'), required=True, metavar='FILE')
-    parser.add_argument('-m', '--min-significance', help='Minimum significance (default: 0)',
-                        type=int, default=0, dest='min_significance', metavar='INT')
-    parser.add_argument('-d', '--keep-duplicates', help='Keep duplicate combinations',
-                        action='store_true', dest='keep_duplicates')
-    parser.add_argument('-o', '--output', help='output in csv format',
-                        type=argparse.FileType('w'), required=True, metavar='FILE')
+    parser = argparse.ArgumentParser(description='sort combinations by significance'
+                                     formatter_class=argparse.RawTextHelpFormatter, add_help=False)
+    io_args = parser.add_argument_group('Input/output files')
+    io_args.add_argument('-i', '--input', help='Input file with lines <name> <combinations.csv path>',
+                         type=argparse.FileType('r'), required=True, metavar='File')
+    io_args.add_argument('-o', '--output', help='Output in csv format',
+                         type=argparse.FileType('w'), required=True, metavar='File')
+
+    opt_args = parser.add_argument_group('Optional arguments')
+    opt_args.add_argument('-m', '--min-significance', help='Minimum significance (default: 0)',
+                          type=int, default=0, dest='min_significance', metavar='Int')
+    opt_args.add_argument('-d', '--keep-duplicates', help='Keep duplicate combinations',
+                          action='store_true', dest='keep_duplicates')
+
+    other = parser.add_argument_group('Other arguments')
+    other.add_argument('-h', '--help', action='help', help='Show this help message and exit')
+    other.add_argument('--version', action='version', help='Show version', version=__version__)
 
     args = parser.parse_args()
     combinations_list = count_significance(args.input)

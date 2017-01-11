@@ -5,6 +5,8 @@ import sys
 from collections import Counter
 from collections import defaultdict
 
+from _version import __version__
+
 
 class Parameters:
     left_margin = 60
@@ -79,28 +81,31 @@ def load_segment_coverage(segment_coverage_f):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='potential mismatches extraction', add_help=False)
-    input_files = parser.add_argument_group('input files')
-    input_files.add_argument('-s', '--segment-coverage', help='file with lines <segment> <coverage>',
-                             type=argparse.FileType('r'), required=True, metavar='FILE',
+    parser = argparse.ArgumentParser(description='Potential mismatches extraction',
+                                     formatter_class=argparse.RawTextHelpFormatter, add_help=False,
+                                     usage='%(prog)s -s File -v File -o File [args]')
+    input_files = parser.add_argument_group('Input files')
+    input_files.add_argument('-s', '--segment-coverage', help='File with lines <segment> <coverage>',
+                             type=argparse.FileType('r'), required=True, metavar='File',
                              dest='segment_coverage')
-    input_files.add_argument('-v', '--v-alignment', help='v_alignment.csv', dest='v_alignment',
-                             type=argparse.FileType('r'), required=True, metavar='FILE')
+    input_files.add_argument('-v', '--v-alignment', help='Csv file containig V alignment', dest='v_alignment',
+                             type=argparse.FileType('r'), required=True, metavar='File')
 
-    output_files = parser.add_argument_group('output files')
-    output_files.add_argument('-o', '--output', help='potential mismatches in csv format',
-                              type=argparse.FileType('w'), required=True, metavar='FILE')
+    output_files = parser.add_argument_group('Output files')
+    output_files.add_argument('-o', '--output', help='Potential mismatches in csv format',
+                              type=argparse.FileType('w'), required=True, metavar='File')
 
-    optional = parser.add_argument_group('optional arguments')
-    optional.add_argument('--range', help='positions range (default: [60, 290])',
-                          metavar=('INT', 'INT'), nargs=2, default=[60, 290], type=int)
-    optional.add_argument('--coverage', help='segment coverage threshold (default: 200)',
-                          type=int, default=200, metavar='INT')
-    optional.add_argument('--rate', help='mismatch rate threshold (default: 0.1)',
-                          type=float, default=0.1, metavar='FLOAT')
+    optional = parser.add_argument_group('Optional arguments')
+    optional.add_argument('--range', help='Positions range (default: [60, 290])',
+                          metavar=('Int', 'Int'), nargs=2, default=[60, 290], type=int)
+    optional.add_argument('--coverage', help='Segment coverage threshold (default: 200)',
+                          type=int, default=200, metavar='Int')
+    optional.add_argument('--rate', help='Mismatch rate threshold (default: 0.1)',
+                          type=float, default=0.1, metavar='Float')
 
-    other = parser.add_argument_group('other arguments')
-    other.add_argument('-h', '--help', action='help', help='show this help message and exit')
+    other = parser.add_argument_group('Other arguments')
+    other.add_argument('-h', '--help', action='help', help='Show this help message and exit')
+    other.add_argument('--version', action='version', help='Show version', version=__version__)
     args = parser.parse_args()
 
     Parameters.left_margin = args.range[0]

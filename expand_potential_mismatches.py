@@ -5,8 +5,10 @@ import sys
 from collections import Counter
 from collections import defaultdict
 from operator import itemgetter
+
 import potential_mismatches
 import combinations
+from _version import __version__
 
 
 class Parameters:
@@ -120,32 +122,35 @@ def print_mismatches(outp, expanded_output, mismatches, combinations_dict,
 
 
 def main():
-    parser = argparse.ArgumentParser(description='expand potential mismatches', add_help=False)
-    input_files = parser.add_argument_group('input files')
-    input_files.add_argument('-v', '--v-alignment', help='v_alignment.csv', dest='v_alignment',
-                             type=argparse.FileType('r'), required=True, metavar='V')
-    input_files.add_argument('-m', '--mismatches', help='potential_mismatches.csv',
-                             type=argparse.FileType('r'), required=True, metavar='M')
-    input_files.add_argument('-c', '--combinations', help='combinations.csv',
-                             type=argparse.FileType('r'), required=True, metavar='C')
+    parser = argparse.ArgumentParser(description='Expand potential mismatches',
+                                     formatter_class=argparse.RawTextHelpFormatter, add_help=False,
+                                     usage='%(prog)s -v File -m File -c File -o File [-e File] [args]')
+    input_files = parser.add_argument_group('Input files')
+    input_files.add_argument('-v', '--v-alignment', help='Csv file containig V alignment', dest='v_alignment',
+                             type=argparse.FileType('r'), required=True, metavar='File')
+    input_files.add_argument('-m', '--mismatches', help='Csv file contating potential mismatches',
+                             type=argparse.FileType('r'), required=True, metavar='File')
+    input_files.add_argument('-c', '--combinations', help='Csv file containing combinations',
+                             type=argparse.FileType('r'), required=True, metavar='File')
 
-    output_files = parser.add_argument_group('output files')
-    output_files.add_argument('-o', '--output', help='expanded potential mismatches in csv format',
-                              type=argparse.FileType('w'), required=True, metavar='O')
-    output_files.add_argument('-e', '--expanded', help='only expanded mismatches (optional)',
-                              type=argparse.FileType('w'), metavar='E')
+    output_files = parser.add_argument_group('Output files')
+    output_files.add_argument('-o', '--output', help='Expanded potential mismatches in csv format',
+                              type=argparse.FileType('w'), required=True, metavar='File')
+    output_files.add_argument('-e', '--expanded', help='Info about expanded mismatches (optional)',
+                              type=argparse.FileType('w'), metavar='File')
 
-    optional = parser.add_argument_group('optional arguments')
-    optional.add_argument('--range', help='positions range (default: [60, 290])',
-                          metavar=('L', 'R'), nargs=2, default=[60, 290])
-    optional.add_argument('--coverage', help='combination coverage threshold (default: 50)',
-                          type=int, default=50)
-    optional.add_argument('--rate', help='mismatch coverage threshold (rate to combination coverage)'
-                                          ' (default: 0.9)',
-                          type=float, default=0.9)
+    optional = parser.add_argument_group('Optional arguments')
+    optional.add_argument('--range', help='Positions range (default: [60, 290])',
+                          metavar=('Int', 'Int'), nargs=2, default=[60, 290])
+    optional.add_argument('--coverage', help='Combination coverage threshold (default: 50)',
+                          type=int, default=50, metavar='Int')
+    optional.add_argument('--rate', help='Mismatch coverage threshold\n(rate to combination coverage)'
+                                         ' (default: 0.9)',
+                          type=float, default=0.9, metavar='Float')
 
-    other = parser.add_argument_group('other arguments')
-    other.add_argument('-h', '--help', action='help', help='show this help message and exit')
+    other = parser.add_argument_group('Other arguments')
+    other.add_argument('-h', '--help', action='help', help='Show this help message and exit')
+    other.add_argument('--version', action='version', help='Show version', version=__version__)
 
     args = parser.parse_args()
 

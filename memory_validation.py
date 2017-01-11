@@ -7,8 +7,9 @@ import os
 import sys
 from collections import Counter
 from operator import itemgetter
-from extra import nt_string
 
+from extra import nt_string
+from _version import __version__
 
 class Parameters:
     left_margin = 60
@@ -211,32 +212,35 @@ def print_segment_scores(combinations, segment_coverages, mut_combinations_count
 
 
 def main():
-    parser = argparse.ArgumentParser(description='validate novel segments', add_help=False)
-    io_args = parser.add_argument_group('input/output arguments')
+    parser = argparse.ArgumentParser(description='Validate novel segments using memory Rep-seq data',
+                                     formatter_class=argparse.RawTextHelpFormatter, add_help=False,
+                                     usage='%(prog)s -v File -c File -n Str -d Dir [args]')
+    io_args = parser.add_argument_group('Input/output arguments')
     io_args.add_argument('-v', '--v-alignment', help='v_alignment fasta file', dest='v_alignment',
-                         type=argparse.FileType('r'), required=True, metavar='FILE')
-    io_args.add_argument('-c', '--combinations', help='combinations csv file',
-                         type=argparse.FileType('r'), required=True, metavar='FILE')
-    io_args.add_argument('-n', '--name', help='this dataset name', required=True, metavar='FILE')
-    io_args.add_argument('-d', '--directory', help='output directory', required=True, metavar='FILE')
+                         type=argparse.FileType('r'), required=True, metavar='File')
+    io_args.add_argument('-c', '--combinations', help='Combinations csv file',
+                         type=argparse.FileType('r'), required=True, metavar='File')
+    io_args.add_argument('-n', '--name', help='This dataset name', required=True, metavar='Str')
+    io_args.add_argument('-d', '--directory', help='Output directory', required=True, metavar='Dir')
 
-    val_args = parser.add_argument_group('validation arguments')
-    val_args.add_argument('--range', help='positions range (default: [60, 290])',
-                          metavar=('INT', 'INT'), nargs=2, default=[60, 290], type=int)
-    val_args.add_argument('--neigh', help='position neighborhood size (default: 3)',
-                          metavar='INT', default=3, type=int)
-    val_args.add_argument('--neigh-overhead', help='acceptable mismatch rate overhead '
+    val_args = parser.add_argument_group('Validation arguments')
+    val_args.add_argument('--range', help='Positions range (default: [60, 290])',
+                          metavar=('Int', 'Int'), nargs=2, default=[60, 290], type=int)
+    val_args.add_argument('--neigh', help='Position neighborhood size (default: 3)',
+                          metavar='Int', default=3, type=int)
+    val_args.add_argument('--neigh-overhead', help='Acceptable mismatch rate overhead\n'
                                                    'in the position neighborhood (default: 1.1)',
-                          metavar='FLOAT', default=1.1, type=float, dest='neigh_overhead')
-    val_args.add_argument('--neigh-good', help='position is treated good, if its mismatch rate is less '
-                                               'than --neigh-good (default: 0.2)',
-                          metavar='FLOAT', default=0.2, type=float, dest='neigh_good')
-    val_args.add_argument('--neigh-bad', help='position is treated good, if its mismatch rate is more '
-                                               'than --neigh-bad (default: 0.8)',
-                          metavar='FLOAT', default=0.8, type=float, dest='neigh_bad')
+                          metavar='Float', default=1.1, type=float, dest='neigh_overhead')
+    val_args.add_argument('--neigh-good', help='Position is treated good, if its mismatch rate is\n'
+                                               'less than --neigh-good (default: 0.2)',
+                          metavar='Float', default=0.2, type=float, dest='neigh_good')
+    val_args.add_argument('--neigh-bad', help='Position is treated good, if its mismatch rate is\n'
+                                               'more than --neigh-bad (default: 0.8)',
+                          metavar='Float', default=0.8, type=float, dest='neigh_bad')
 
-    other = parser.add_argument_group('other arguments')
-    other.add_argument('-h', '--help', action='help', help='show this help message and exit')
+    other = parser.add_argument_group('Other arguments')
+    other.add_argument('-h', '--help', action='help', help='Show this help message and exit')
+    other.add_argument('--version', action='version', help='Show version', version=__version__)
     args = parser.parse_args()
 
     Parameters.left_margin, Parameters.right_margin = args.range

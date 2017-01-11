@@ -5,7 +5,7 @@ import re
 import sys
 
 from extra import nt_string
-
+from _version import __version__
 
 def analyze_v_alignment(inp, outp):
     fasta_iter = nt_string.read_fasta(inp)
@@ -40,11 +40,17 @@ def analyze_v_alignment(inp, outp):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='v alignment mismatches and indels statistics')
-    parser.add_argument('-i', '--input', help='input: v_alignment.fasta',
-                        type=argparse.FileType('r'), required=True, metavar='FILE')
-    parser.add_argument('-o', '--output', help='output: v_alignment.csv',
-                        type=argparse.FileType('w'), required=True, metavar='FILE')
+    parser = argparse.ArgumentParser(description='V alignment mismatches and indels statistics',
+                                     formatter_class=argparse.RawTextHelpFormatter, add_help=False)
+    io_args = parser.add_argument_group('Input/output arguments')
+    io_args.add_argument('-i', '--input', help='Input: v_alignment.fasta',
+                         type=argparse.FileType('r'), required=True, metavar='File')
+    io_args.add_argument('-o', '--output', help='Output: v_alignment.csv',
+                         type=argparse.FileType('w'), required=True, metavar='File')
+
+    other = parser.add_argument_group('Other arguments')
+    other.add_argument('-h', '--help', action='help', help='Show this help message and exit')
+    other.add_argument('--version', action='version', help='Show version', version=__version__)
 
     args = parser.parse_args()
     args.output.write('# %s\n' % ' '.join(sys.argv))

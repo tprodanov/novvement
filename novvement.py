@@ -237,7 +237,7 @@ def generate(args, log, datasets):
     log.write('\n# Generating novel segments\n')
 
     command = [os.path.join(script_path, 'combinations_to_segments.py'),
-               '-c', os.path.join(dir, 'combinations.csv'),
+               '-i', os.path.join(dir, 'combinations.csv'),
                '-v', args.v_segments,
                '-o', os.path.join(dir, 'segments.fa')]
     command = [str(x) for x in command]
@@ -252,7 +252,7 @@ def time_to_str(seconds):
     h = seconds // 3600
     m = (seconds % 3600) // 60
     s = seconds % 60
-    return ('%d:' % h if h else '') + '%d:%d' % (m, s) 
+    return ('%d:' % h if h else '') + '%d:%d' % (m, s)
 
 
 def run(args, human_args):
@@ -294,67 +294,70 @@ def run(args, human_args):
 def main():
     parser = argparse.ArgumentParser(description='Pipeline for detecting novel segments.\n'
                                                  'Created by Timofey Prodanov (timofey.prodanov@gmail.com)',
-                                     usage='%(prog)s -i DATASETS -v V_SEGMENTS -o OUT_DIR',
+                                     usage='%(prog)s -i File -v File -o Dir',
                                      add_help=False, formatter_class=argparse.RawTextHelpFormatter)
     io_args = parser.add_argument_group('Inpur/output arguments')
-    io_args.add_argument('-i', '--input', required=True, metavar='FILE', type=argparse.FileType(),
-                         help='file with lines <name> <path to cdr folder>.\n'
+    io_args.add_argument('-i', '--input', required=True, metavar='File', type=argparse.FileType(),
+                         help='File with lines <name> <path to cdr folder>.\n'
                               'Should contain: v_alignments.fa, alignment_info.csv')
-    io_args.add_argument('-v', '--v-segments', required=True, metavar='FILE', help='file containing V segments',
-                         dest='v_segments')
-    io_args.add_argument('-o', '--output', help='output directory', required=True, metavar='DIR')
-    io_args.add_argument('-f', '--force', help='override files in output directory', action='store_true')
-    human_args = [('Input/output', None), ('Input', 'input'), ('V segments', 'v_segments'), ('Output', 'output'), ('Force', 'force')]
+    io_args.add_argument('-v', '--v-segments', required=True, metavar='File',
+                         help='Fasta file containing V segments', dest='v_segments')
+    io_args.add_argument('-o', '--output', help='Output directory', required=True, metavar='Dir')
+    io_args.add_argument('-f', '--force', help='Override files in output directory', action='store_true')
+    human_args = [('Input/output', None), ('Input', 'input'), ('V segments', 'v_segments'), ('Output', 'output'),
+                  ('Force', 'force')]
 
     mismatch_args = parser.add_argument_group('Mismatch detection arguments')
-    mismatch_args.add_argument('--range', help='positions range (default: [60, 290])',
-                               metavar=('INT', 'INT'), nargs=2, default=[60, 290], type=int)
-    mismatch_args.add_argument('--segment-coverage', help='segment coverage threshold (default: 200)',
-                               type=int, default=200, metavar='INT', dest='segment_coverage')
-    mismatch_args.add_argument('--mismatch-rate', help='mismatch rate threshold (default: 0.1)',
-                               type=float, default=0.1, metavar='FLOAT', dest='mismatch_rate')
-    human_args += [('mismatch detection', None), ('Range', 'range'), ('Segment coverage', 'segment_coverage'), ('Mismatch rate', 'mismatch_rate')]
+    mismatch_args.add_argument('--range', help='Positions range (default: [60, 290])',
+                               metavar=('Int', 'Int'), nargs=2, default=[60, 290], type=int)
+    mismatch_args.add_argument('--segment-coverage', help='Segment coverage threshold (default: 200)',
+                               type=int, default=200, metavar='Int', dest='segment_coverage')
+    mismatch_args.add_argument('--mismatch-rate', help='Mismatch rate threshold (default: 0.1)',
+                               type=float, default=0.1, metavar='Float', dest='mismatch_rate')
+    human_args += [('mismatch detection', None), ('Range', 'range'), ('Segment coverage', 'segment_coverage'),
+                   ('Mismatch rate', 'mismatch_rate')]
 
     comb_args = parser.add_argument_group('Combination detection arguments')
-    comb_args.add_argument('--length', help='min combination length (default: 2)',
-                           type=int, default=2, metavar='INT')
-    comb_args.add_argument('--cov-single-j', help='min coverage with the single J hit (default: 15)',
-                           type=int, default=15, metavar='INT', dest='cov_single_j')
-    comb_args.add_argument('--cov-mult-j', help='min coverage with multiple J hits (default: 5)',
-                           type=int, default=5, metavar='INT', dest='cov_mult_j')
-    comb_args.add_argument('--human-readable', help='include human readable info', action='store_true',
+    comb_args.add_argument('--length', help='Min combination length (default: 2)',
+                           type=int, default=2, metavar='Int')
+    comb_args.add_argument('--cov-single-j', help='Min coverage with the single J hit (default: 15)',
+                           type=int, default=15, metavar='Int', dest='cov_single_j')
+    comb_args.add_argument('--cov-mult-j', help='Min coverage with multiple J hits (default: 5)',
+                           type=int, default=5, metavar='Int', dest='cov_mult_j')
+    comb_args.add_argument('--human-readable', help='Include human readable info', action='store_true',
                             dest='human_readable')
     human_args += [('Combination detection', None), ('Length', 'length'), ('Coverage w/ single J hit', 'cov_single_j'),
                    ('Coverage w/ multiple J hits', 'cov_mult_j'), ('Human readable', 'human_readable')]
 
     exp_args = parser.add_argument_group('Combination expansion arguments')
-    exp_args.add_argument('--comb-coverage', help='combination coverage threshold (default: 50)',
-                          type=int, default=50, metavar='INT', dest='comb_coverage')
-    exp_args.add_argument('--expansion-rate', help='mismatch coverage threshold (ratio\nto combination coverage) (default: 0.9)',
-                          type=float, default=0.9, metavar='FLOAT', dest='expansion_rate')
-    human_args += [('Combination expansion', None), ('Combination coverage', 'comb_coverage'), ('Expansion rate', 'expansion_rate')]
+    exp_args.add_argument('--comb-coverage', help='Combination coverage threshold (default: 50)',
+                          type=int, default=50, metavar='Int', dest='comb_coverage')
+    exp_args.add_argument('--expansion-rate', help='Mismatch coverage threshold (ratio\n'
+                                                   'to combination coverage) (default: 0.9)',
+                          type=float, default=0.9, metavar='Float', dest='expansion_rate')
+    human_args += [('Combination expansion', None), ('Combination coverage', 'comb_coverage'),
+                   ('Expansion rate', 'expansion_rate')]
 
     filter_args = parser.add_argument_group('Segments filtering arguments')
-    filter_args.add_argument('--min-significance', help='min significance (default: 20)',
-                             type=int, metavar='INT', default=20, dest='min_significance')
-    filter_args.add_argument('--source-dist', help='minimum required distance to\n'
+    filter_args.add_argument('--min-significance', help='Min significance (default: 20)',
+                             type=int, metavar='Int', default=20, dest='min_significance')
+    filter_args.add_argument('--source-dist', help='Minimum required distance to\n'
                                                    'any source segment (default: --length)',
-                             metavar='INT', dest='source_dist', type=int)
-    filter_args.add_argument('--target-dist', help='minimum reliable distance to\n'
+                             metavar='Int', dest='source_dist', type=int)
+    filter_args.add_argument('--target-dist', help='Minimum reliable distance to\n'
                                                    'any target combination (default: 3)',
-                             metavar='INT', dest='target_dist', type=int, default=3)
-    filter_args.add_argument('--target-mf', help='significance multiplication factor\n'
+                             metavar='Int', dest='target_dist', type=int, default=3)
+    filter_args.add_argument('--target-mf', help='Significance multiplication factor\n'
                                                  'to filter out combination with unreliable\n'
                                                  'target distance (default: 4)',
-                             metavar='FLOAT', dest='target_mf', type=float, default=4)
+                             metavar='Float', dest='target_mf', type=float, default=4)
     human_args += [('Segments filtering', None), ('Min significance', 'min_significance'),
                    ('Distance to source', 'source_dist'), ('Distance to target', 'target_dist'),
                    ('Significance multiplication factor', 'target_mf')]
 
     other = parser.add_argument_group('Other arguments')
-    other.add_argument('-h', '--help', action='help', help='show this help message and exit')
-    other.add_argument('--version', action='version', help='show version',
-                       version=__version__)
+    other.add_argument('-h', '--help', action='help', help='Show this help message and exit')
+    other.add_argument('--version', action='version', help='Show version', version=__version__)
 
     args = parser.parse_args()
     if not args.source_dist:

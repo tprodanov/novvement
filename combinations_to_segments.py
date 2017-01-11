@@ -5,6 +5,7 @@ import re
 from operator import itemgetter
 from collections import defaultdict
 from extra import nt_string
+from _version import __version__
 
 
 def read_segments(inp, outp=None):
@@ -52,15 +53,22 @@ def generate(segments, combinations, outp):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='convert combinations into sequences')
-    parser.add_argument('-c', '--combinations', help='combinations csv file',
-                        type=argparse.FileType('r'), required=True, metavar='FILE')
-    parser.add_argument('-v', '--v-segments', help='V segments fasta file', type=argparse.FileType('r'),
-                        dest='v_segments', required=True, metavar='FILE')
-    parser.add_argument('-o', '--output', help='output fasta', type=argparse.FileType('w'),
-                        required=True, metavar='FILE')
-    parser.add_argument('--discard-original', help='do not include original IGHV fasta entries',
-                        action='store_true', dest='discard_original')
+    parser = argparse.ArgumentParser(description='Convert combinations into sequences',
+                                     formatter_class=argparse.RawTextHelpFormatter, add_help=False)
+    io_args = parser.add_argument_group('Input/output arguments')
+    io_args.add_argument('-i', '--input', help='Input combinations csv file',
+                         type=argparse.FileType('r'), required=True, metavar='File')
+    io_args.add_argument('-v', '--v-segments', help='V segments fasta file', type=argparse.FileType('r'),
+                         dest='v_segments', required=True, metavar='File')
+    io_args.add_argument('-o', '--output', help='Output fasta', type=argparse.FileType('w'),
+                         required=True, metavar='File')
+    io_args.add_argument('--discard-original', help='Do not include original V segments',
+                         action='store_true', dest='Discard_original')
+
+    other = parser.add_argument_group('Other arguments')
+    other.add_argument('-h', '--help', action='help', help='Show this help message and exit')
+    other.add_argument('--version', action='version', help='Show version', version=__version__)
+
     args = parser.parse_args()
 
     segments = read_segments(args.v_segments, None if args.discard_original else args.output)

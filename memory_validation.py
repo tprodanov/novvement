@@ -155,6 +155,7 @@ class SegmentScore:
         self.good_positions = 0
         for pos in self.positions:
             if pos < Parameters.left_margin or pos > Parameters.right_margin:
+                print(pos)
                 raise KeyPositionsOffRange
             if ratio_information[pos - Parameters.left_margin][0] <= Parameters.neighborhood_auto_good:
                 self.good_positions += 1
@@ -239,6 +240,7 @@ def main():
     args = parser.parse_args()
 
     Parameters.left_margin, Parameters.right_margin = args.range
+    # Parameters.left_margin -= 1
     Parameters.neighborhood = args.neigh
     Parameters.neighborhood_ratio = args.neigh_overhead
     Parameters.neighborhood_auto_good = args.neigh_good

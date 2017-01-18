@@ -6,11 +6,26 @@ import sys
 import io
 import subprocess
 import time
+from termcolor import colored
+
 from extra._version import __version__
 
 
+def print_colored(msg, stdout, col, attr=None):
+    (sys.stdout if stdout else sys.stderr).write(
+            colored(msg, col, attrs=[attr] if attr else []))
+
+
+def oprint(msg, col, attr=None):
+    print_colored(msg, True, col, attr)
+
+
+def eprint(msg, col, attr=None):
+    print_colored(msg, False, col, attr)
+
+
 def rc_fail():
-    sys.stderr.write('\nNon-empty return code\n')
+    oprint('\nNon-empty return code\n', 'red')
     exit(1)
 
 
@@ -44,11 +59,12 @@ def make_datasets_file(dir, log, datasets):
 
 def segment_coverage(args, log, datasets):
     dir = args.output
-    sys.stdout.write('Segment coverage\n')
+    oprint('Segment coverage\n', 'green', 'bold')
     log.write('\n# Segment coverage\n')
 
     for name, path in datasets:
-        with open(os.path.join(path, 'alignment_info.csv')) as inp, open(os.path.join(dir, name, 'alignment', 'segment_coverage.csv'), 'w') as outp:
+        with open(os.path.join(path, 'alignment_info.csv')) as inp, \
+                open(os.path.join(dir, name, 'alignment', 'segment_coverage.csv'), 'w') as outp:
             log.write("\tcat %s | cut -f5 | sort | uniq -c | awk '{t = $1; $1 = $2; $2 = t; print}' > %s\n" % (inp.name, outp.name))
             p1 = subprocess.Popen(['cut', '-f5'], stdin=inp, stdout=subprocess.PIPE)
             p2 = subprocess.Popen(['sort'], stdin=p1.stdout, stdout=subprocess.PIPE)
@@ -64,7 +80,7 @@ def segment_coverage(args, log, datasets):
 
 def j_hits(args, log, datasets):
     dir = args.output
-    sys.stdout.write('J hit\n')
+    oprint('J hit\n', 'green', 'bold')
     log.write('\n# J hit\n')
 
     for name, path in datasets:
@@ -80,7 +96,7 @@ def v_alignment(args, log, datasets):
     dir = args.output
     script_path = os.path.dirname(__file__)
 
-    sys.stdout.write('V alignment -> csv\n')
+    oprint('V alignment -> csv\n')
     log.write('\n# V alignment -> csv\n')
     for name, path in datasets:
         sys.stdout.write('%s ' % name)
@@ -99,7 +115,7 @@ def potential_mismatches(args, log, datasets):
     dir = args.output
     script_path = os.path.dirname(__file__)
 
-    sys.stdout.write('Detecting potential mismatches\n')
+    oprint('Detecting potential mismatches\n', 'green', 'bold')
     log.write('\n# Detecting potential mismatches\n')
     for name, path in datasets:
         mkdir(os.path.join(dir, name, 'combinations_a'))
@@ -130,7 +146,8 @@ def combinations(args, log, datasets, iteration, last):
 
     comb_dir = combinations_dirname(iteration)
 
-    sys.stdout.write('Combining potential mismatches. Iteration %d\n' % (iteration + 1))
+    oprint('Combining potential mismatches. ', 'green', 'bold')
+    oprint('Iteration %d\n' % (iteration + 1), 'green')
     log.write('\n# Combining potential mismatches. Iteration %d\n' % (iteration + 1))
 
     for name, path in datasets:
@@ -160,7 +177,8 @@ def expand_mismatches(args, log, datasets, iteration):
     dir = args.output
     script_path = os.path.dirname(__file__)
 
-    sys.stdout.write('Expanding combinations. Iteration %d\n' % (iteration + 1))
+    oprint('Expanding combinations. ', 'green', 'bold')
+    oprint('Iteration %d\n' % (iteration + 1), 'green')
     log.write('\n# Expanding combinations. Iteration %d\n' % (iteration + 1))
 
     prev_dir = combinations_dirname(iteration)
@@ -197,7 +215,7 @@ def significance(args, log, datasets, last_dir):
 
     script_path = os.path.dirname(__file__)
 
-    sys.stdout.write('Evaluating combination significance\n')
+    oprint('Evaluating combination significance\n', 'green')
     log.write('\n# Evaluating combination significance\n')
 
     command = [os.path.join(script_path, 'significance.py'),
@@ -221,7 +239,7 @@ def filter_combinations(args, log, datasets):
     dir = args.output
     script_path = os.path.dirname(__file__)
 
-    sys.stdout.write('Filter combinations\n')
+    oprint('Filter combinations\n', 'green')
     log.write('\n# Filter combinations\n')
 
     command = [os.path.join(script_path, 'similarity_filter.py'),
@@ -243,7 +261,7 @@ def generate(args, log, datasets):
     dir = args.output
     script_path = os.path.dirname(__file__)
 
-    sys.stdout.write('Generating novel segments\n')
+    oprint('Generating novel segments\n', 'green')
     log.write('\n# Generating novel segments\n')
 
     command = [os.path.join(script_path, 'combinations_to_segments.py'),
@@ -255,7 +273,9 @@ def generate(args, log, datasets):
     if subprocess.run(command).returncode:
         rc_fail()
 
-    sys.stdout.write('Segments generated ::::: %s\n' % os.path.join(dir, 'segments.fa'))
+    oprint('Segments generated', 'yellow', 'bold')
+    oprint(' ::::: ', 'cyan', 'bold')
+    oprint('%s\n' % os.path.join(dir, 'segments.fa'), 'yellow')
 
 
 def time_to_str(seconds):
@@ -270,7 +290,7 @@ def run(args, human_args):
     dir = args.output
     mkdir(args.output)
     if not args.force and os.listdir(dir):
-        sys.stderr.write('Output folder is not empty. Try -f/--force\n')
+        eprint('Output folder is not empty. Try -f/--force\n', 'red')
         exit(1)
 
     datasets = [tuple(line.strip().split(' ', 1)) for line in args.input if not line.startswith('#')]
@@ -300,7 +320,7 @@ def run(args, human_args):
 
         seconds = time.perf_counter() - start
         t = time_to_str(seconds)
-        sys.stdout.write('Execution time: %s\n' % t)
+        oprint('Execution time: %s\n' % t, 'magenta')
         log.write('\n# Execution time: %s\n' % t)
 
 
@@ -382,7 +402,7 @@ def main():
     try:
         run(args, human_args)
     except KeyboardInterrupt:
-        sys.stderr.write('\nKeyboard interrupt\n')
+        eprint('\nKeyboard interrupt\n', 'red')
         exit(1)
 
 

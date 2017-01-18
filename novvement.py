@@ -25,7 +25,7 @@ def eprint(msg, col, attr=None):
 
 
 def rc_fail():
-    oprint('\nNon-empty return code\n', 'red')
+    eprint('\nNon-empty return code\n', 'red')
     exit(1)
 
 
@@ -59,7 +59,7 @@ def make_datasets_file(dir, log, datasets):
 
 def segment_coverage(args, log, datasets):
     dir = args.output
-    oprint('Segment coverage\n', 'green', 'bold')
+    oprint('Segment coverage\n', 'green')
     log.write('\n# Segment coverage\n')
 
     for name, path in datasets:
@@ -80,7 +80,7 @@ def segment_coverage(args, log, datasets):
 
 def j_hits(args, log, datasets):
     dir = args.output
-    oprint('J hit\n', 'green', 'bold')
+    oprint('J hit\n', 'green')
     log.write('\n# J hit\n')
 
     for name, path in datasets:
@@ -96,7 +96,7 @@ def v_alignment(args, log, datasets):
     dir = args.output
     script_path = os.path.dirname(__file__)
 
-    oprint('V alignment -> csv\n')
+    oprint('V alignment -> csv\n', 'green')
     log.write('\n# V alignment -> csv\n')
     for name, path in datasets:
         sys.stdout.write('%s ' % name)
@@ -115,7 +115,7 @@ def potential_mismatches(args, log, datasets):
     dir = args.output
     script_path = os.path.dirname(__file__)
 
-    oprint('Detecting potential mismatches\n', 'green', 'bold')
+    oprint('Detecting potential mismatches\n', 'green')
     log.write('\n# Detecting potential mismatches\n')
     for name, path in datasets:
         mkdir(os.path.join(dir, name, 'combinations_a'))
@@ -146,8 +146,8 @@ def combinations(args, log, datasets, iteration, last):
 
     comb_dir = combinations_dirname(iteration)
 
-    oprint('Combining potential mismatches. ', 'green', 'bold')
-    oprint('Iteration %d\n' % (iteration + 1), 'green')
+    oprint('Combining potential mismatches. ', 'green')
+    oprint('Iteration %d\n' % (iteration + 1), 'cyan')
     log.write('\n# Combining potential mismatches. Iteration %d\n' % (iteration + 1))
 
     for name, path in datasets:
@@ -177,8 +177,8 @@ def expand_mismatches(args, log, datasets, iteration):
     dir = args.output
     script_path = os.path.dirname(__file__)
 
-    oprint('Expanding combinations. ', 'green', 'bold')
-    oprint('Iteration %d\n' % (iteration + 1), 'green')
+    oprint('Expanding combinations. ', 'green')
+    oprint('Iteration %d\n' % (iteration + 1), 'cyan')
     log.write('\n# Expanding combinations. Iteration %d\n' % (iteration + 1))
 
     prev_dir = combinations_dirname(iteration)
@@ -274,8 +274,8 @@ def generate(args, log, datasets):
         rc_fail()
 
     oprint('Segments generated', 'yellow', 'bold')
-    oprint(' ::::: ', 'cyan', 'bold')
-    oprint('%s\n' % os.path.join(dir, 'segments.fa'), 'yellow')
+    oprint(' ::::: ', 'green')
+    oprint('%s\n' % os.path.join(dir, 'segments.fa'), 'cyan')
 
 
 def time_to_str(seconds):
@@ -312,9 +312,9 @@ def run(args, human_args):
         for i in range(args.expansion_cycles):
             combinations(args, log, datasets, i, False)
             expand_mismatches(args, log, datasets, i)
-        combinations(args, log, datasets, i, True)
+        combinations(args, log, datasets, args.expansion_cycles, True)
 
-        significance(args, log, datasets, combinations_dirname(i))
+        significance(args, log, datasets, combinations_dirname(args.expansion_cycles))
         filter_combinations(args, log, datasets)
         generate(args, log, datasets)
 

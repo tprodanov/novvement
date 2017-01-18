@@ -8,7 +8,7 @@ from operator import itemgetter
 
 import potential_mismatches
 import combinations
-from _version import __version__
+from extra._version import __version__
 
 
 class Parameters:

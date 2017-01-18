@@ -7,7 +7,7 @@ import subprocess
 import io
 from operator import itemgetter
 
-from _version import __version__
+from extra._version import __version__
 
 def rc_fail():
     sys.stderr.write('\nNon-empty return code\n')

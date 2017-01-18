@@ -6,7 +6,7 @@ import random
 
 import similarity_filter
 import combinations_to_segments
-from _version import __version__
+from extra._version import __version__
 
 def random_combination(l, r, segment_seq, length, min_dist, source):
     while True:

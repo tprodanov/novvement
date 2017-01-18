@@ -5,7 +5,7 @@ from operator import itemgetter
 from os import path
 import sys
 
-from _version import __version__
+from extra._version import __version__
 
 class Combination:
     def __init__(self, line, name):
@@ -72,7 +72,7 @@ def write_combinations(combinations_list, min_significance, keep_duplicates, out
 
 
 def main():
-    parser = argparse.ArgumentParser(description='sort combinations by significance'
+    parser = argparse.ArgumentParser(description='sort combinations by significance',
                                      formatter_class=argparse.RawTextHelpFormatter, add_help=False)
     io_args = parser.add_argument_group('Input/output files')
     io_args.add_argument('-i', '--input', help='Input file with lines <name> <combinations.csv path>',

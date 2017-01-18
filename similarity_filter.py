@@ -5,7 +5,7 @@ import sys
 import itertools
 
 import combinations_to_segments
-from _version import __version__
+from extra._version import __version__
 
 def distance(seq1, seq2):
     return sum(nt1 != nt2 for nt1, nt2 in itertools.zip_longest(seq1, seq2))

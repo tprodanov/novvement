@@ -6,7 +6,7 @@ import sys
 import io
 import subprocess
 import time
-from _version import __version__
+from extra._version import __version__
 
 
 def rc_fail():
@@ -120,12 +120,18 @@ def potential_mismatches(args, log, datasets):
     sys.stdout.write('\n')
 
 
-def combinations(args, log, datasets, comb_dir):
+def combinations_dirname(iteration):
+    return 'combinations_' + chr(ord('a') + iteration)
+
+
+def combinations(args, log, datasets, iteration, last):
     dir = args.output
     script_path = os.path.dirname(__file__)
 
-    sys.stdout.write('Combining potential mismatches\n')
-    log.write('\n# Combining potential mismatches\n')
+    comb_dir = combinations_dirname(iteration)
+
+    sys.stdout.write('Combining potential mismatches. Iteration %d\n' % (iteration + 1))
+    log.write('\n# Combining potential mismatches. Iteration %d\n' % (iteration + 1))
 
     for name, path in datasets:
         sys.stdout.write('%s ' % name)
@@ -134,7 +140,7 @@ def combinations(args, log, datasets, comb_dir):
                    '-v', os.path.join(dir, name, 'alignment', 'v_alignment.csv'),
                    '-j', os.path.join(dir, name, 'alignment', 'j_hit.csv'),
                    '-m', os.path.join(dir, name, comb_dir, 'potential_mismatches.csv')]
-        if comb_dir.endswith('b'):
+        if last:
             command += ['-d', os.path.join(dir, 'datasets.csv')]
         command += ['-o', os.path.join(dir, name, comb_dir, 'combinations.csv')]
         if args.human_readable:
@@ -150,22 +156,26 @@ def combinations(args, log, datasets, comb_dir):
     sys.stdout.write('\n')
 
 
-def expand_mismatches(args, log, datasets):
+def expand_mismatches(args, log, datasets, iteration):
     dir = args.output
     script_path = os.path.dirname(__file__)
 
-    sys.stdout.write('Expanding combinations\n')
-    log.write('\n# Expanding combinations\n')
+    sys.stdout.write('Expanding combinations. Iteration %d\n' % (iteration + 1))
+    log.write('\n# Expanding combinations. Iteration %d\n' % (iteration + 1))
+
+    prev_dir = combinations_dirname(iteration)
+    next_dir = combinations_dirname(iteration + 1)
+
     for name, path in datasets:
-        mkdir(os.path.join(dir, name, 'combinations_b'))
+        mkdir(os.path.join(dir, name, next_dir))
         sys.stdout.write('%s ' % name)
         sys.stdout.flush()
         command = [os.path.join(script_path, 'expand_potential_mismatches.py'),
                    '-v', os.path.join(dir, name, 'alignment', 'v_alignment.csv'),
-                   '-m', os.path.join(dir, name, 'combinations_a', 'potential_mismatches.csv'),
-                   '-c', os.path.join(dir, name, 'combinations_a', 'combinations.csv'),
-                   '-o', os.path.join(dir, name, 'combinations_b', 'potential_mismatches.csv'),
-                   '-e', os.path.join(dir, name, 'combinations_b', 'expanded_mismatches.csv'),
+                   '-m', os.path.join(dir, name, prev_dir, 'potential_mismatches.csv'),
+                   '-c', os.path.join(dir, name, prev_dir, 'combinations.csv'),
+                   '-o', os.path.join(dir, name, next_dir, 'potential_mismatches.csv'),
+                   '-e', os.path.join(dir, name, next_dir, 'expanded_mismatches.csv'),
                    '--range', args.range[0], args.range[1],
                    '--coverage', args.comb_coverage,
                    '--rate', args.expansion_rate]
@@ -177,13 +187,13 @@ def expand_mismatches(args, log, datasets):
     sys.stdout.write('\n')
 
 
-def significance(args, log, datasets):
+def significance(args, log, datasets, last_dir):
     dir = args.output
 
     with open(os.path.join(dir, 'combinations_path.csv'), 'w') as f:
         log.write('\n# generate <name> <combinations.csv> file (%s)\n' % f.name)
         for name, _ in datasets:
-            f.write('%s %s\n' % (name, os.path.join(name, 'combinations_b', 'combinations.csv')))
+            f.write('%s %s\n' % (name, os.path.join(name, last_dir, 'combinations.csv')))
 
     script_path = os.path.dirname(__file__)
 
@@ -278,10 +288,13 @@ def run(args, human_args):
         j_hits(args, log, datasets)
         v_alignment(args, log, datasets)
         potential_mismatches(args, log, datasets)
-        combinations(args, log, datasets, 'combinations_a')
-        expand_mismatches(args, log, datasets)
-        combinations(args, log, datasets, 'combinations_b')
-        significance(args, log, datasets)
+
+        for i in range(args.expansion_cycles):
+            combinations(args, log, datasets, i, False)
+            expand_mismatches(args, log, datasets, i)
+        combinations(args, log, datasets, i, True)
+
+        significance(args, log, datasets, combinations_dirname(i))
         filter_combinations(args, log, datasets)
         generate(args, log, datasets)
 
@@ -330,13 +343,16 @@ def main():
                    ('Coverage w/ multiple J hits', 'cov_mult_j'), ('Human readable', 'human_readable')]
 
     exp_args = parser.add_argument_group('Combination expansion arguments')
+    exp_args.add_argument('--expansion-cycles', help='Number of combination expansion\n'
+                                                     'cycles (default: 1)',
+                          type=int, default=1, metavar='Int', dest='expansion_cycles')                    
     exp_args.add_argument('--comb-coverage', help='Combination coverage threshold (default: 50)',
                           type=int, default=50, metavar='Int', dest='comb_coverage')
     exp_args.add_argument('--expansion-rate', help='Mismatch coverage threshold (ratio\n'
                                                    'to combination coverage) (default: 0.9)',
                           type=float, default=0.9, metavar='Float', dest='expansion_rate')
-    human_args += [('Combination expansion', None), ('Combination coverage', 'comb_coverage'),
-                   ('Expansion rate', 'expansion_rate')]
+    human_args += [('Combination expansion', None), ('Expansion cycles', 'expansion_cycles'),
+                   ('Combination coverage', 'comb_coverage'), ('Expansion rate', 'expansion_rate')]
 
     filter_args = parser.add_argument_group('Segments filtering arguments')
     filter_args.add_argument('--min-significance', help='Min significance (default: 20)',

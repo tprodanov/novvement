@@ -9,7 +9,7 @@ import re
 import sys
 
 from extra import utilities
-from _version import __version__
+from extra._version import __version__
 import potential_mismatches
 
 

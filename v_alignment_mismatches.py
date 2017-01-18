@@ -5,7 +5,7 @@ import re
 import sys
 
 from extra import nt_string
-from _version import __version__
+from extra._version import __version__
 
 def analyze_v_alignment(inp, outp):
     fasta_iter = nt_string.read_fasta(inp)

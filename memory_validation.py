@@ -9,7 +9,7 @@ from collections import Counter
 from operator import itemgetter
 
 from extra import nt_string
-from _version import __version__
+from extra._version import __version__
 
 class Parameters:
     left_margin = 60

@@ -5,7 +5,7 @@ import re
 from operator import itemgetter
 from collections import defaultdict
 from extra import nt_string
-from _version import __version__
+from extra._version import __version__
 
 
 def read_segments(inp, outp=None):
@@ -63,7 +63,7 @@ def main():
     io_args.add_argument('-o', '--output', help='Output fasta', type=argparse.FileType('w'),
                          required=True, metavar='File')
     io_args.add_argument('--discard-original', help='Do not include original V segments',
-                         action='store_true', dest='Discard_original')
+                         action='store_true', dest='discard_original')
 
     other = parser.add_argument_group('Other arguments')
     other.add_argument('-h', '--help', action='help', help='Show this help message and exit')
@@ -72,7 +72,7 @@ def main():
     args = parser.parse_args()
 
     segments = read_segments(args.v_segments, None if args.discard_original else args.output)
-    generate(segments, args.combinations, args.output)
+    generate(segments, args.input, args.output)
 
 
 if __name__ == '__main__':

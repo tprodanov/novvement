@@ -5,7 +5,7 @@ import sys
 from collections import Counter
 from collections import defaultdict
 
-from _version import __version__
+from extra._version import __version__
 
 
 class Parameters:

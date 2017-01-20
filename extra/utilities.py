@@ -1,6 +1,6 @@
 import sys
 from operator import itemgetter
-
+from termcolor import colored
 
 class Tee:
     def __init__(self, f, g=sys.stdout):
@@ -37,3 +37,17 @@ def v_alignment_to_mismatches(v_alignment, potential_mismatches):
     if prev_read and read_mismatches:
         read_mismatches.sort(key=itemgetter(0))
         yield prev_read, prev_segment, read_mismatches
+
+
+def print_colored(msg, stdout, col, attrs):
+    (sys.stdout if stdout else sys.stderr).write(colored(msg, col, attrs=attrs))
+
+
+def oprint(msg, col, *attrs):
+    print_colored(msg, True, col, attrs)
+
+
+def eprint(msg, col, *attrs):
+    print_colored(msg, False, col, attrs)
+
+

@@ -6,22 +6,10 @@ import sys
 import io
 import subprocess
 import time
-from termcolor import colored
+import datetime
 
 from extra._version import __version__
-
-
-def print_colored(msg, stdout, col, attr=None):
-    (sys.stdout if stdout else sys.stderr).write(
-            colored(msg, col, attrs=[attr] if attr else []))
-
-
-def oprint(msg, col, attr=None):
-    print_colored(msg, True, col, attr)
-
-
-def eprint(msg, col, attr=None):
-    print_colored(msg, False, col, attr)
+from extra.utilities import oprint, eprint
 
 
 def rc_fail():
@@ -274,15 +262,8 @@ def generate(args, log, datasets):
         rc_fail()
 
     oprint('Segments generated', 'yellow', 'bold')
-    oprint(' ::::: ', 'green')
+    sys.stdout.write(' ::::: ')
     oprint('%s\n' % os.path.join(dir, 'segments.fa'), 'cyan')
-
-
-def time_to_str(seconds):
-    h = seconds // 3600
-    m = (seconds % 3600) // 60
-    s = seconds % 60
-    return ('%d:' % h if h else '') + '%d:%d' % (m, s)
 
 
 def run(args, human_args):
@@ -319,8 +300,8 @@ def run(args, human_args):
         generate(args, log, datasets)
 
         seconds = time.perf_counter() - start
-        t = time_to_str(seconds)
-        oprint('Execution time: %s\n' % t, 'magenta')
+        time_str = str(datetime.timedelta(seconds=round(seconds))
+        oprint('Execution time: %s\n' % time_str, 'magenta')
         log.write('\n# Execution time: %s\n' % t)
 
 

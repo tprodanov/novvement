@@ -6,11 +6,15 @@ import os
 import subprocess
 import io
 from operator import itemgetter
+import time
+import datetime
 
 from extra._version import __version__
+from extra.utilities import oprint, eprint
+
 
 def rc_fail():
-    sys.stderr.write('\nNon-empty return code\n')
+    eprint('\nNon-empty return code\n', 'red')
     exit(1)
 
 
@@ -49,8 +53,8 @@ def load_datasets(f, log):
         if len(s) == 1:
             datasets.append((s[0], []))
         elif not datasets:
-            sys.stderr.write('Datasets file should start with line <name>, that indicate '
-                             'the beginning of a new individual.\n')
+            eprint('Datasets file should start with line <name>, that indicate '
+                   'the beginning of a new individual.\n', 'red')
             exit(1)
         else:
             datasets[-1][1].append(tuple(s))
@@ -66,10 +70,12 @@ def validate(args, datasets, log):
     script_path = os.path.dirname(__file__)
     datasets_path = os.path.dirname(args.datasets.name)
 
-    sys.stdout.write('Validation\n')
+    oprint('Validation\n', 'green')
     log.write('# Validation\n')
     for individual, ind_datasets in datasets:
-        sys.stdout.write('%s: ' % individual)
+        oprint(individual, 'white', 'bold')
+        sys.stdout.write(': ')
+
         for name, path in ind_datasets:
             sys.stdout.write('%s ' % name)
             sys.stdout.flush()
@@ -97,7 +103,7 @@ def combined_validate(args, datasets, log):
     script_path = os.path.dirname(__file__)
     datasets_path = os.path.dirname(args.datasets.name)
 
-    sys.stdout.write('Combining individual datasets\n')
+    oprint('Combining individual datasets\n', 'green')
     log.write('# Combining individual datasets\n')
     for individual, ind_datasets in datasets:
         sys.stdout.write('%s ' % individual)
@@ -158,10 +164,12 @@ def combine_segments_summary(args, datasets, log):
 
 
 def run(args, human_args):
+    start = time.perf_counter()
+
     dir = args.output
     mkdir(dir)
     if not args.force and os.listdir(dir):
-        sys.stderr.write('Output folder is not empty. Try -f/--force\n')
+        eprint('Output folder is not empty. Try -f/--force\n', 'red')
         exit(1)
 
     with open(os.path.join(dir, 'log.txt'), 'w') as log:
@@ -176,7 +184,12 @@ def run(args, human_args):
         validate(args, datasets, log)
         combined_validate(args, datasets, log)
         combine_segments_summary(args, datasets, log)
-        sys.stdout.write(':::: Success ::::\n')
+    oprint(':::: Success ::::\n', 'yellow')
+
+    seconds = time.perf_counter() - start
+    time_str = str(datetime.timedelta(seconds=round(seconds)))
+    oprint('Execution time: %s\n' % time_str, 'magenta')
+
 
 
 def main():

@@ -300,7 +300,7 @@ def run(args, human_args):
         generate(args, log, datasets)
 
         seconds = time.perf_counter() - start
-        time_str = str(datetime.timedelta(seconds=round(seconds))
+        time_str = str(datetime.timedelta(seconds=round(seconds)))
         oprint('Execution time: %s\n' % time_str, 'magenta')
         log.write('\n# Execution time: %s\n' % t)
 

@@ -27,28 +27,28 @@ def min_distance(seq, source):
 
 def keep(name, seq, significance, source, target, args):
     if args.source_dist:
-        dist, segment = min_distance(seq, source)
-        if dist < args.source_dist:
-            args.log.write('%s is too close to %s (distance %d)\n' % (name, segment, dist))
-            return False
+        s_dist, segment = min_distance(seq, source)
+        if s_dist < args.source_dist:
+            args.log.write('%s is too close to %s (distance %d)\n' % (name, segment, s_dist))
+            return 0
 
     if not args.target_dist:
-        return True
+        return s_dist
 
     if not target:
-        return True
+        return s_dist
 
     dist, nearest_significance, oth = min_distance(seq, target)
     if dist == 0:
         args.log.write('%s is equal to %s\n' % (name, oth))
-        return False
+        return 0
     if dist >= args.target_dist:
-        return True
+        return s_dist
     if significance * args.target_mf < nearest_significance:
         args.log.write('%s is too close to %s (distance %d, mf %d / %d = %.2f)\n'
                        % (name, oth, dist, nearest_significance, significance, nearest_significance / significance))
-        return False
-    return True
+        return 0
+    return s_dist
 
 
 def run(args):
@@ -76,8 +76,11 @@ def run(args):
 
         name = '%s-M%d' % (segment, i + 1)
 
-        if keep(name, seq, significance, source, target, args):
-            outp.write(line)
+        s_dist = keep(name, seq, significance, source, target, args)
+        if s_dist:
+            split_line[2] = str(s_dist)
+            outp.write('\t'.join(split_line))
+            outp.write('\n')
             target.append((seq, significance, name))
 
 

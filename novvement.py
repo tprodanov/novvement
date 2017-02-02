@@ -34,6 +34,9 @@ def log_header(log, args, human_args):
         else:
             v = args[v]
             log.write('#\t\t%s: %s\n' % (k, v.name if isinstance(v, io.IOBase) else v))
+
+    for line in __version__.splitlines():
+        log.write('# %s\n' % line)
     log.write('\n')
     log.flush()
 
@@ -53,8 +56,9 @@ def segment_coverage(args, log, datasets):
     for name, path in datasets:
         with open(os.path.join(path, 'alignment_info.csv')) as inp, \
                 open(os.path.join(dir, name, 'alignment', 'segment_coverage.csv'), 'w') as outp:
-            log.write("\tcat %s | cut -f5 | sort | uniq -c | awk '{t = $1; $1 = $2; $2 = t; print}' > %s\n" % (inp.name, outp.name))
-            p1 = subprocess.Popen(['cut', '-f5'], stdin=inp, stdout=subprocess.PIPE)
+            log.write("\tcat %s | cut -f%d | sort | uniq -c | awk '{t = $1; $1 = $2; $2 = t; print}' > %s\n" 
+                      % (inp.name, args.v_col, outp.name))
+            p1 = subprocess.Popen(['cut', '-f', str(args.v_col)], stdin=inp, stdout=subprocess.PIPE)
             p2 = subprocess.Popen(['sort'], stdin=p1.stdout, stdout=subprocess.PIPE)
             p3 = subprocess.Popen(['uniq', '-c'], stdin=p2.stdout, stdout=subprocess.PIPE)
             p4 = subprocess.Popen(['awk', '{t = $1; $1 = $2; $2 = t; print}'], stdin=p3.stdout, stdout=outp)
@@ -73,8 +77,8 @@ def j_hits(args, log, datasets):
 
     for name, path in datasets:
         with open(os.path.join(path, 'alignment_info.csv')) as inp, open(os.path.join(dir, name, 'alignment', 'j_hit.csv'), 'w') as outp:
-            log.write("\tcat %s | cut -f1,9 > %s\n" % (inp.name, outp.name))
-            p1 = subprocess.Popen(['cut', '-f1,9'], stdin=inp, stdout=outp)
+            log.write("\tcat %s | cut -f1,%d > %s\n" % (inp.name, args.j_col, outp.name))
+            p1 = subprocess.Popen(['cut', '-f1,%d' % args.j_col], stdin=inp, stdout=outp)
             p1.communicate()
             if p1.returncode:
                 rc_fail()
@@ -300,8 +304,8 @@ def run(args, human_args):
         generate(args, log, datasets)
 
         seconds = time.perf_counter() - start
-        time_str = str(datetime.timedelta(seconds=round(seconds)))
-        oprint('Execution time: %s\n' % time_str, 'magenta')
+        t = str(datetime.timedelta(seconds=round(seconds)))
+        oprint('Execution time: %s\n' % t, 'magenta')
         log.write('\n# Execution time: %s\n' % t)
 
 
@@ -320,6 +324,15 @@ def main():
     io_args.add_argument('-f', '--force', help='Override files in output directory', action='store_true')
     human_args = [('Input/output', None), ('Input', 'input'), ('V segments', 'v_segments'), ('Output', 'output'),
                   ('Force', 'force')]
+
+    input_fmt = parser.add_argument_group('Input format arguments')
+    input_fmt.add_argument('--v-col', help='Number of a V-hit column in \n'
+                                           '<alignment_info.csv> (default: 5)',
+                           type=int, metavar='Int', default=5, dest='v_col')
+    input_fmt.add_argument('--j-col', help='Number of a J-hit column in \n'
+                                           '<alignment_info.csv> (default: 9)',
+                           type=int, metavar='Int', default=9, dest='j_col')
+    human_args += [('Input format', None), ('V column', 'v_col'), ('J column', 'j_col')]
 
     mismatch_args = parser.add_argument_group('Mismatch detection arguments')
     mismatch_args.add_argument('--range', help='Positions range (default: [60, 290])',

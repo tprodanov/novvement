@@ -274,7 +274,7 @@ def run(args, human_args):
     start = time.perf_counter()
     dir = args.output
     mkdir(args.output)
-    if not args.force and os.listdir(dir):
+    if not args.force and os.listdir(dir) and args.start == 'A':
         eprint('Output folder is not empty. Try -f/--force\n', 'red')
         exit(1)
 
@@ -282,16 +282,17 @@ def run(args, human_args):
 
     with open(os.path.join(dir, 'log.txt'), 'w') as log:
         log_header(log, args, human_args)
+        
+        if args.start == 'A':
+            make_datasets_file(dir, log, datasets)
+            for name, path in datasets:
+                mkdir(os.path.join(dir, name))
+                mkdir(os.path.join(dir, name, 'alignment'))
 
-        make_datasets_file(dir, log, datasets)
-
-        for name, path in datasets:
-            mkdir(os.path.join(dir, name))
-            mkdir(os.path.join(dir, name, 'alignment'))
-
-        segment_coverage(args, log, datasets)
-        j_hits(args, log, datasets)
-        v_alignment(args, log, datasets)
+            segment_coverage(args, log, datasets)
+            j_hits(args, log, datasets)
+            v_alignment(args, log, datasets)
+        
         potential_mismatches(args, log, datasets)
 
         for i in range(args.expansion_cycles):
@@ -322,8 +323,12 @@ def main():
                          help='Fasta file containing V segments', dest='v_segments')
     io_args.add_argument('-o', '--output', help='Output directory', required=True, metavar='Dir')
     io_args.add_argument('-f', '--force', help='Override files in output directory', action='store_true')
+    io_args.add_argument('--start', help='Start from a specific point in a pipeline:\n'
+                                         'A: start from the beginning (default)\n'
+                                         'B: start from detecting potential mismatches\n',
+                         choices=['A', 'B'], default='A')
     human_args = [('Input/output', None), ('Input', 'input'), ('V segments', 'v_segments'), ('Output', 'output'),
-                  ('Force', 'force')]
+                  ('Force', 'force'), ('Start', 'start')]
 
     input_fmt = parser.add_argument_group('Input format arguments')
     input_fmt.add_argument('--v-col', help='Number of a V-hit column in \n'

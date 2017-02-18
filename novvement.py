@@ -95,7 +95,8 @@ def v_alignment(args, log, datasets):
         sys.stdout.flush()
         command = [os.path.join(script_path, 'v_alignment_mismatches.py'),
                    '-i', os.path.join(path, 'v_alignments.fa'),
-                   '-o', os.path.join(dir, name, 'alignment', 'v_alignment.csv')]
+                   '-o', os.path.join(dir, name, 'alignment', 'v_alignment.csv'),
+                   '--mismatches-only']
         log.write('\t%s\n' % ' '.join(command))
         if subprocess.run(command).returncode:
             rc_fail()

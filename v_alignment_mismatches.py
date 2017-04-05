@@ -19,8 +19,12 @@ def polymorphism_type(nt1, nt2, j):
 
 
 
-def analyze_v_alignment(inp, outp, mismatches_only):
-    outp.write('segment\tread\ttype\tposition\tnt\n')
+def analyze_v_alignment(inp, outp, *, mismatches_only=False, germline_nt=False):
+    outp.write('segment\tread\ttype\tposition\t')
+    if germline_nt:
+        outp.write('germline\t')
+    outp.write('nt\n')
+
     if mismatches_only:
         not_mism_write = lambda s: None
     else:
@@ -45,7 +49,10 @@ def analyze_v_alignment(inp, outp, mismatches_only):
             if mismatches_only and polym[0] != 'm':
                 continue
 
-            outp.write('%s\t%s\t%s\t%d\t%s\n' % (segment_name, read_name, polym, j, nt1))
+            outp.write('%s\t%s\t%s\t%d\t' % (segment_name, read_name, polym, j))
+            if germline_nt:
+                outp.write('%s\t' % nt2)
+            outp.write('%s\n' % nt1)
 
 
 def main():
@@ -58,6 +65,8 @@ def main():
                          type=argparse.FileType('w'), required=True, metavar='File')
     io_args.add_argument('-m', '--mismatches-only', help='Print mismatches only',
                          action='store_true', dest='mismatches_only')
+    io_args.add_argument('-g', '--germline-nt', help='Print nt in germline',
+                         action='store_true', dest='germline_nt')
 
     other = parser.add_argument_group('Other arguments')
     other.add_argument('-h', '--help', action='help', help='Show this help message and exit')
@@ -65,7 +74,8 @@ def main():
 
     args = parser.parse_args()
     args.output.write('# %s\n' % ' '.join(sys.argv))
-    analyze_v_alignment(args.input, args.output, args.mismatches_only)
+    analyze_v_alignment(args.input, args.output,
+                        mismatches_only=args.mismatches_only, germline_nt=args.germline_nt)
 
 
 if __name__ == '__main__':

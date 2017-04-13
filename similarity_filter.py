@@ -71,6 +71,9 @@ def run(args):
         split_line = line.strip().split('\t')
         segment = split_line[0]
         significance = int(split_line[1])
+        if significance < args.significance:
+            break
+
         combination = split_line[3]
         seq = combinations_to_segments.generate_novel_segment(segments[segment].seq, combination)[l:r]
 
@@ -99,6 +102,8 @@ def main():
                          type=argparse.FileType('w'), metavar='File', default='/dev/null')
 
     filter_args = parser.add_argument_group('Filter arguments')
+    filter_args.add_argument('--significance', help='Minimal accepted significance (default: 15)',
+                             metavar='Int', type=int, default=15)
     filter_args.add_argument('--range', help='Positions range (default: [60, 290])',
                              metavar=('Int', 'Int'), type=int, nargs=2, default=[60, 290])
     filter_args.add_argument('--source-dist', help='Minimum required distance to\n'

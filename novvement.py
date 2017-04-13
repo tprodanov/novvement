@@ -214,7 +214,7 @@ def significance(args, log, datasets, last_dir):
     command = [os.path.join(script_path, 'significance.py'),
                '-i', os.path.join(dir, 'combinations_path.csv'),
                '-o', os.path.join(dir, 'significance.csv'),
-               '-m', args.min_significance]
+               '-m', 0]
     command = [str(x) for x in command]
     log.write('\t%s\n' % ' '.join(command))
     subprocess.run(command)
@@ -240,6 +240,7 @@ def filter_combinations(args, log, datasets):
                '-v', args.v_segments,
                '-o', os.path.join(dir, 'combinations.csv'),
                '-l', os.path.join(dir, 'filter.log'),
+               '--significance', args.min_significance,
                '--range', args.range[0], args.range[1],
                '--source-dist', args.source_dist,
                '--target-dist', args.target_dist,

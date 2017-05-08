@@ -40,7 +40,9 @@ def v_alignment_to_mismatches(v_alignment, potential_mismatches):
 
 
 def print_colored(msg, stdout, col, attrs):
-    (sys.stdout if stdout else sys.stderr).write(colored(msg, col, attrs=attrs))
+    stream = sys.stdout if stdout else sys.stderr
+    stream.write(colored(msg, col, attrs=attrs))
+    stream.flush()
 
 
 def oprint(msg, col, *attrs):

@@ -42,10 +42,10 @@ def log_header(log, args, human_args):
 
 
 def make_datasets_file(dir, log, datasets):
-    with open(os.path.join(dir, 'datasets.csv'), 'w') as f:
+    with open(os.path.join(dir, 'data', 'datasets.csv'), 'w') as f:
         log.write('\n# generate <name> <v_alignment.csv> file (%s)\n' % f.name)
         for name, _ in datasets:
-            f.write('%s %s\n' % (name, os.path.join(name, 'alignment', 'v_alignment.csv')))
+            f.write('%s %s\n' % (name, os.path.join('data', name, 'alignment', 'v_alignment.csv')))
 
 
 def segment_coverage(args, log, datasets):
@@ -55,7 +55,7 @@ def segment_coverage(args, log, datasets):
 
     for name, path in datasets:
         with open(os.path.join(path, 'alignment_info.csv')) as inp, \
-                open(os.path.join(dir, name, 'alignment', 'segment_coverage.csv'), 'w') as outp:
+                open(os.path.join(dir, 'data', name, 'alignment', 'segment_coverage.csv'), 'w') as outp:
             log.write("\tcat %s | cut -f%d | sort | uniq -c | awk '{t = $1; $1 = $2; $2 = t; print}' > %s\n" 
                       % (inp.name, args.v_col, outp.name))
             p1 = subprocess.Popen(['cut', '-f', str(args.v_col)], stdin=inp, stdout=subprocess.PIPE)
@@ -76,7 +76,8 @@ def j_hits(args, log, datasets):
     log.write('\n# J hit\n')
 
     for name, path in datasets:
-        with open(os.path.join(path, 'alignment_info.csv')) as inp, open(os.path.join(dir, name, 'alignment', 'j_hit.csv'), 'w') as outp:
+        with open(os.path.join(path, 'alignment_info.csv')) as inp, \
+                open(os.path.join(dir, 'data', name, 'alignment', 'j_hit.csv'), 'w') as outp:
             log.write("\tcat %s | cut -f1,%d > %s\n" % (inp.name, args.j_col, outp.name))
             p1 = subprocess.Popen(['cut', '-f1,%d' % args.j_col], stdin=inp, stdout=outp)
             p1.communicate()
@@ -95,7 +96,7 @@ def v_alignment(args, log, datasets):
         sys.stdout.flush()
         command = [os.path.join(script_path, 'v_alignment_mismatches.py'),
                    '-i', os.path.join(path, 'v_alignments.fa'),
-                   '-o', os.path.join(dir, name, 'alignment', 'v_alignment.csv'),
+                   '-o', os.path.join(dir, 'data', name, 'alignment', 'v_alignment.csv'),
                    '--mismatches-only']
         log.write('\t%s\n' % ' '.join(command))
         if subprocess.run(command).returncode:
@@ -111,13 +112,13 @@ def potential_mismatches(args, log, datasets):
     oprint('Detecting potential mismatches\n', 'green')
     log.write('\n# Detecting potential mismatches\n')
     for name, path in datasets:
-        mkdir(os.path.join(dir, name, 'combinations_a'))
+        mkdir(os.path.join(dir, 'data', name, 'combinations_a'))
         sys.stdout.write('%s ' % name)
         sys.stdout.flush()
         command = [os.path.join(script_path, 'potential_mismatches.py'),
-                   '-v', os.path.join(dir, name, 'alignment', 'v_alignment.csv'),
-                   '-s', os.path.join(dir, name, 'alignment', 'segment_coverage.csv'),
-                   '-o', os.path.join(dir, name, 'combinations_a', 'potential_mismatches.csv'),
+                   '-v', os.path.join(dir, 'data', name, 'alignment', 'v_alignment.csv'),
+                   '-s', os.path.join(dir, 'data', name, 'alignment', 'segment_coverage.csv'),
+                   '-o', os.path.join(dir, 'data', name, 'combinations_a', 'potential_mismatches.csv'),
                    '--range', args.range[0], args.range[1],
                    '--coverage', args.segment_coverage,
                    '--rate', args.mismatch_rate]
@@ -129,11 +130,18 @@ def potential_mismatches(args, log, datasets):
     sys.stdout.write('\n')
 
 
-def combinations_dirname(iteration):
-    return 'combinations_' + chr(ord('a') + iteration)
+def combinations_dirname(i):
+    from string import ascii_lowercase
+    n = len(ascii_lowercase)
+
+    if i < n:
+        suffix = ascii_lowercase[i]
+    else:
+        suffix = ascii_lowercase[i // n - 1] + ascii_lowercase[i % n]
+    return 'combinations_' + suffix
 
 
-def combinations(args, log, datasets, iteration, last):
+def combinations(args, log, datasets, iteration, detection_coverage):
     dir = args.output
     script_path = os.path.dirname(__file__)
 
@@ -147,16 +155,12 @@ def combinations(args, log, datasets, iteration, last):
         sys.stdout.write('%s ' % name)
         sys.stdout.flush()
         command = [os.path.join(script_path, 'combinations.py'),
-                   '-v', os.path.join(dir, name, 'alignment', 'v_alignment.csv'),
-                   '-j', os.path.join(dir, name, 'alignment', 'j_hit.csv'),
-                   '-m', os.path.join(dir, name, comb_dir, 'potential_mismatches.csv')]
-        if last:
-            command += ['-d', os.path.join(dir, 'datasets.csv')]
-        command += ['-o', os.path.join(dir, name, comb_dir, 'combinations.csv')]
-        if args.human_readable:
-            command += ['-h', os.path.join(dir, name, comb_dir, 'human_combinations.txt')]
-        command += ['--length', args.length,
-                    '--cov-single-j', args.cov_single_j, '--cov-mult-j', args.cov_mult_j]
+                   '-v', os.path.join(dir, 'data', name, 'alignment', 'v_alignment.csv'),
+                   '-j', os.path.join(dir, 'data', name, 'alignment', 'j_hit.csv'),
+                   '-m', os.path.join(dir, 'data', name, comb_dir, 'potential_mismatches.csv'),
+                   '-o', os.path.join(dir, 'data', name, comb_dir, 'combinations.csv'),
+                   '--length', args.length,
+                    '--cov-single-j', detection_coverage, '--cov-mult-j', detection_coverage]
 
         command = [str(x) for x in command]
         log.write('\t%s\n' % ' '.join(command))
@@ -178,17 +182,17 @@ def expand_mismatches(args, log, datasets, iteration):
     next_dir = combinations_dirname(iteration + 1)
 
     for name, path in datasets:
-        mkdir(os.path.join(dir, name, next_dir))
+        mkdir(os.path.join(dir, 'data', name, next_dir))
         sys.stdout.write('%s ' % name)
         sys.stdout.flush()
         command = [os.path.join(script_path, 'expand_potential_mismatches.py'),
-                   '-v', os.path.join(dir, name, 'alignment', 'v_alignment.csv'),
-                   '-m', os.path.join(dir, name, prev_dir, 'potential_mismatches.csv'),
-                   '-c', os.path.join(dir, name, prev_dir, 'combinations.csv'),
-                   '-o', os.path.join(dir, name, next_dir, 'potential_mismatches.csv'),
-                   '-e', os.path.join(dir, name, next_dir, 'expanded_mismatches.csv'),
+                   '-v', os.path.join(dir, 'data', name, 'alignment', 'v_alignment.csv'),
+                   '-m', os.path.join(dir, 'data', name, prev_dir, 'potential_mismatches.csv'),
+                   '-c', os.path.join(dir, 'data', name, prev_dir, 'combinations.csv'),
+                   '-o', os.path.join(dir, 'data', name, next_dir, 'potential_mismatches.csv'),
+                   '-e', os.path.join(dir, 'data', name, next_dir, 'expanded_mismatches.csv'),
                    '--range', args.range[0], args.range[1],
-                   '--coverage', args.comb_coverage,
+                   '--coverage', args.expansion_coverage,
                    '--rate', args.expansion_rate]
         command = [str(x) for x in command]
         log.write('\t%s\n' % ' '.join(command))
@@ -198,67 +202,78 @@ def expand_mismatches(args, log, datasets, iteration):
     sys.stdout.write('\n')
 
 
-def significance(args, log, datasets, last_dir):
+def group_allelic(args, log, datasets, last_dir):
     dir = args.output
+    script_path = os.path.dirname(__file__)
 
-    with open(os.path.join(dir, 'combinations_path.csv'), 'w') as f:
-        log.write('\n# generate <name> <combinations.csv> file (%s)\n' % f.name)
+    oprint('Grouping allelic variations\n', 'green')
+
+    mkdir(os.path.join(dir, 'group'))
+    filename = os.path.join(dir, 'group', 'paths.txt')
+    log.write('\n# Writing paths to combinations -> %s\n' % filename)
+    with open(filename, 'w') as f:
         for name, _ in datasets:
-            f.write('%s %s\n' % (name, os.path.join(name, last_dir, 'combinations.csv')))
+            f.write('%s\t%s\n' % (name,
+                os.path.join('..', 'data', name, last_dir, 'combinations.csv')))
 
-    script_path = os.path.dirname(__file__)
-
-    oprint('Evaluating combination significance\n', 'green')
-    log.write('\n# Evaluating combination significance\n')
-
-    command = [os.path.join(script_path, 'significance.py'),
-               '-i', os.path.join(dir, 'combinations_path.csv'),
-               '-o', os.path.join(dir, 'significance.csv'),
-               '-m', 0]
-    command = [str(x) for x in command]
-    log.write('\t%s\n' % ' '.join(command))
-    subprocess.run(command)
-
-    log.write('\n# Significance -> Combinations\n')
-    with open(os.path.join(dir, 'significance.csv')) as inp, open(os.path.join(dir, 'pre_combinations.csv'), 'w') as outp:
-        log.write('\tcat %s | cut -f2- > %s\n' % (inp.name, outp.name))
-        p1 = subprocess.Popen(['cut', '-f2-'], stdin=inp, stdout=outp)
-        p1.communicate()
-        if p1.returncode:
-            rc_fail()
-
-
-def filter_combinations(args, log, datasets):
-    dir = args.output
-    script_path = os.path.dirname(__file__)
-
-    oprint('Filter combinations\n', 'green')
-    log.write('\n# Filter combinations\n')
-
-    command = [os.path.join(script_path, 'similarity_filter.py'),
-               '-c', os.path.join(dir, 'pre_combinations.csv'),
+    log.write('\n# Grouping allelic variations\n')
+    command = [os.path.join(script_path, 'group_allelic.py'),
+               '-d', filename,
                '-v', args.v_segments,
-               '-o', os.path.join(dir, 'combinations.csv'),
-               '-l', os.path.join(dir, 'filter.log'),
-               '--significance', args.min_significance,
+               '-o', os.path.join(dir, 'group', 'short.txt'),
+               '-f', os.path.join(dir, 'group', 'full.txt'),
+               '-c', os.path.join(dir, 'group', 'components.txt'),
                '--range', args.range[0], args.range[1],
-               '--source-dist', args.source_dist,
-               '--target-dist', args.target_dist,
-               '--target-mf', args.target_mf]
+               '--source-dist', args.length,
+               '--j-coverage', args.j_coverage,
+               '--dat-coverage', args.dat_coverage,
+               '--hamming', args.hamming,
+               '--shared', args.shared]
     command = [str(x) for x in command]
     log.write('\t%s\n' % ' '.join(command))
     if subprocess.run(command).returncode:
         rc_fail()
 
+    sys.stdout.write('\n')
+
 
 def generate(args, log, datasets):
     dir = args.output
+
     script_path = os.path.dirname(__file__)
 
-    oprint('Generating novel segments\n', 'green')
+    oprint('Generating segments\n', 'green')
+    inp_name = os.path.join(dir, 'group', 'components.txt')
+    out_name = os.path.join(dir, 'combinations.csv')
+    log.write('\n# Filtered combinations at %s\n' % out_name)
+
+    with open(inp_name) as inp, open(out_name, 'w') as outp:
+        outp.write('segment\tcombination\tsignificance\n')
+        outp.flush()
+
+        grep_command = ('grep', '-Pv', '^([\\s#]|$)')
+        cut_command = ('cut', '-f2,5')
+        sed_command = ('sed', 's/\\./\\t/')
+        awk_command = ('awk', '$1 > 2 {OFS="\\t"; t=$1; $1=$2; $2=$3; $3=t; print}')
+
+        log.write('\tcat %s | %s | %s | %s | %s > %s\n'
+                  % (inp_name, "%s %s '%s'" % grep_command, ' '.join(cut_command),
+                     "%s '%s'" % sed_command, "%s '%s'" % awk_command, out_name))
+        
+        p1 = subprocess.Popen(grep_command, stdin=inp, stdout=subprocess.PIPE)
+        p2 = subprocess.Popen(cut_command, stdin=p1.stdout, stdout=subprocess.PIPE)
+        p3 = subprocess.Popen(sed_command, stdin=p2.stdout, stdout=subprocess.PIPE)
+        p4 = subprocess.Popen(awk_command, stdin=p3.stdout, stdout=outp)
+        p1.stdout.close()
+        p2.stdout.close()
+        p3.stdout.close()
+        p4.communicate()
+        if p4.returncode:
+            rc_fail()
+
     log.write('\n# Generating novel segments\n')
 
-    command = [os.path.join(script_path, 'combinations_to_segments.py'),
+    command = [os.path.join(script_path, 'make_segments.py'),
                '-i', os.path.join(dir, 'combinations.csv'),
                '-v', args.v_segments,
                '-o', os.path.join(dir, 'segments.fa')]
@@ -281,6 +296,7 @@ def run(args, human_args):
         exit(1)
 
     datasets = [tuple(line.strip().split(' ', 1)) for line in args.input if not line.startswith('#')]
+    mkdir(os.path.join(dir, 'data'))
 
     with open(os.path.join(dir, 'log.txt'), 'w') as log:
         log_header(log, args, human_args)
@@ -288,8 +304,8 @@ def run(args, human_args):
         if args.start == 'A':
             make_datasets_file(dir, log, datasets)
             for name, path in datasets:
-                mkdir(os.path.join(dir, name))
-                mkdir(os.path.join(dir, name, 'alignment'))
+                mkdir(os.path.join(dir, 'data', name))
+                mkdir(os.path.join(dir, 'data', name, 'alignment'))
 
             segment_coverage(args, log, datasets)
             j_hits(args, log, datasets)
@@ -298,12 +314,11 @@ def run(args, human_args):
         potential_mismatches(args, log, datasets)
 
         for i in range(args.expansion_cycles):
-            combinations(args, log, datasets, i, False)
+            combinations(args, log, datasets, i, args.detection_coverage)
             expand_mismatches(args, log, datasets, i)
-        combinations(args, log, datasets, args.expansion_cycles, True)
+        combinations(args, log, datasets, args.expansion_cycles, 0)
 
-        significance(args, log, datasets, combinations_dirname(args.expansion_cycles))
-        filter_combinations(args, log, datasets)
+        group_allelic(args, log, datasets, combinations_dirname(args.expansion_cycles))
         generate(args, log, datasets)
 
         seconds = time.perf_counter() - start
@@ -322,7 +337,7 @@ def main():
                          help='File with lines <name> <path to cdr folder>.\n'
                               'Should contain: v_alignments.fa, alignment_info.csv')
     io_args.add_argument('-v', '--v-segments', required=True, metavar='File',
-                         help='Fasta file containing V segments', dest='v_segments')
+                         help='Fasta file containing V segments')
     io_args.add_argument('-o', '--output', help='Output directory', required=True, metavar='Dir')
     io_args.add_argument('-f', '--force', help='Override files in output directory', action='store_true')
     io_args.add_argument('--start', help='Start from a specific point in a pipeline:\n'
@@ -332,73 +347,69 @@ def main():
     human_args = [('Input/output', None), ('Input', 'input'), ('V segments', 'v_segments'), ('Output', 'output'),
                   ('Force', 'force'), ('Start', 'start')]
 
-    input_fmt = parser.add_argument_group('Input format arguments')
+    input_fmt = parser.add_argument_group('Input format')
     input_fmt.add_argument('--v-col', help='Number of a V-hit column in \n'
                                            '<alignment_info.csv> (default: 5)',
-                           type=int, metavar='Int', default=5, dest='v_col')
+                           type=int, metavar='Int', default=5)
     input_fmt.add_argument('--j-col', help='Number of a J-hit column in \n'
                                            '<alignment_info.csv> (default: 9)',
-                           type=int, metavar='Int', default=9, dest='j_col')
+                           type=int, metavar='Int', default=9)
     human_args += [('Input format', None), ('V column', 'v_col'), ('J column', 'j_col')]
 
-    mismatch_args = parser.add_argument_group('Mismatch detection arguments')
+    mismatch_args = parser.add_argument_group('Mismatch detection')
     mismatch_args.add_argument('--range', help='Positions range (default: [60, 290])',
                                metavar=('Int', 'Int'), nargs=2, default=[60, 290], type=int)
     mismatch_args.add_argument('--segment-coverage', help='Segment coverage threshold (default: 200)',
-                               type=int, default=200, metavar='Int', dest='segment_coverage')
+                               type=int, default=200, metavar='Int')
     mismatch_args.add_argument('--mismatch-rate', help='Mismatch rate threshold (default: 0.1)',
-                               type=float, default=0.1, metavar='Float', dest='mismatch_rate')
-    human_args += [('mismatch detection', None), ('Range', 'range'), ('Segment coverage', 'segment_coverage'),
+                               type=float, default=0.1, metavar='Float')
+    human_args += [('Mismatch detection', None), ('Range', 'range'), ('Segment coverage', 'segment_coverage'),
                    ('Mismatch rate', 'mismatch_rate')]
 
-    comb_args = parser.add_argument_group('Combination detection arguments')
-    comb_args.add_argument('--length', help='Min combination length (default: 2)',
-                           type=int, default=2, metavar='Int')
-    comb_args.add_argument('--cov-single-j', help='Min coverage with the single J hit (default: 15)',
-                           type=int, default=15, metavar='Int', dest='cov_single_j')
-    comb_args.add_argument('--cov-mult-j', help='Min coverage with multiple J hits (default: 5)',
-                           type=int, default=5, metavar='Int', dest='cov_mult_j')
-    comb_args.add_argument('--human-readable', help='Include human readable info', action='store_true',
-                            dest='human_readable')
-    human_args += [('Combination detection', None), ('Length', 'length'), ('Coverage w/ single J hit', 'cov_single_j'),
-                   ('Coverage w/ multiple J hits', 'cov_mult_j'), ('Human readable', 'human_readable')]
-
-    exp_args = parser.add_argument_group('Combination expansion arguments')
-    exp_args.add_argument('--expansion-cycles', help='Number of combination expansion\n'
+    comb_args = parser.add_argument_group('Combination detection and expansion')
+    comb_args.add_argument('--length', help='Min difference from existing segment (default: 4)',
+                           type=int, default=4, metavar='Int')
+    comb_args.add_argument('--detection-coverage', help='Min coverage to detect a combination (default: 15)',
+                           type=int, default=15, metavar='Int')
+    comb_args.add_argument('--expansion-cycles', help='Number of combination expansion\n'
                                                      'cycles (default: 1)',
-                          type=int, default=1, metavar='Int', dest='expansion_cycles')                    
-    exp_args.add_argument('--comb-coverage', help='Combination coverage threshold (default: 50)',
-                          type=int, default=50, metavar='Int', dest='comb_coverage')
-    exp_args.add_argument('--expansion-rate', help='Mismatch coverage threshold (ratio\n'
+                          type=int, default=1, metavar='Int')
+    comb_args.add_argument('--expansion-coverage',
+                          help='Min combination coverage during expansion (default: 50)',
+                          type=int, default=50, metavar='Int')
+    comb_args.add_argument('--expansion-rate', help='Mismatch coverage threshold (ratio\n'
                                                    'to combination coverage) (default: 0.9)',
-                          type=float, default=0.9, metavar='Float', dest='expansion_rate')
-    human_args += [('Combination expansion', None), ('Expansion cycles', 'expansion_cycles'),
-                   ('Combination coverage', 'comb_coverage'), ('Expansion rate', 'expansion_rate')]
+                          type=float, default=0.9, metavar='Float')
+    human_args += [('Combination detection and expansion', None), ('Length', 'length'),
+                   ('Detection coverage', 'detection_coverage'), ('Expansion cycles', 'expansion_cycles'),
+                   ('Expansion coverage', 'expansion_coverage'), ('Expansion rate', 'expansion_rate')]
 
-    filter_args = parser.add_argument_group('Segments filtering arguments')
+    filter_args = parser.add_argument_group('Segments filtering and grouping')
     filter_args.add_argument('--min-significance', help='Min significance (default: 20)',
-                             type=int, metavar='Int', default=20, dest='min_significance')
-    filter_args.add_argument('--source-dist', help='Minimum required distance to\n'
-                                                   'any source segment (default: --length)',
-                             metavar='Int', dest='source_dist', type=int)
-    filter_args.add_argument('--target-dist', help='Minimum reliable distance to\n'
-                                                   'any target combination (default: 3)',
-                             metavar='Int', dest='target_dist', type=int, default=3)
-    filter_args.add_argument('--target-mf', help='Significance multiplication factor\n'
-                                                 'to filter out combination with unreliable\n'
-                                                 'target distance (default: 4)',
-                             metavar='Float', dest='target_mf', type=float, default=4)
-    human_args += [('Segments filtering', None), ('Min significance', 'min_significance'),
-                   ('Distance to source', 'source_dist'), ('Distance to target', 'target_dist'),
-                   ('Significance multiplication factor', 'target_mf')]
+                             type=int, metavar='Float', default=20, dest='min_significance')
+    filter_args.add_argument('--j-coverage', metavar='Int', type=int, default=50,
+                             help='J segment covers novel segment if they appear\n'
+                                  'together at least <--j-coverage> times (default: 50)')
+    filter_args.add_argument('--dat-coverage', metavar='Int', type=int, default=50,
+                             help='Novel segment is covered by a dataset if they appear\n'
+                                  'together at least <--dat-coverage> times (default: 50)')
+    filter_args.add_argument('--hamming', metavar='Int', type=int, default=2,
+                             help='If distance between two novel segments is at most\n'
+                                  '<--hamming> - these segments will be placed in\n'
+                                  'one group (default: 2)')
+    filter_args.add_argument('--shared', metavar='Float', type=float, default=0.9,
+                             help='Two novel segments will be placed in one group\n'
+                                  'if they share <--shared> of their\n'
+                                  'polymorphisms (default: 0.9)')
+    human_args += [('Segments filtering and grouping', None), ('Min significance', 'min_significance'),
+                   ('J coverage', 'j_coverage'), ('Dataset coverage', 'dat_coverage'),
+                   ('Hamming distance', 'hamming'), ('Shared polymorphisms', 'shared')]
 
     other = parser.add_argument_group('Other arguments')
     other.add_argument('-h', '--help', action='help', help='Show this help message and exit')
     other.add_argument('--version', action='version', help='Show version', version=__version__)
 
     args = parser.parse_args()
-    if not args.source_dist:
-        args.source_dist = args.length
 
     try:
         run(args, human_args)

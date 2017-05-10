@@ -109,19 +109,22 @@ def potential_mismatches(args, log, datasets):
     dir = args.output
     script_path = os.path.dirname(__file__)
 
-    oprint('Detecting potential mismatches\n', 'green')
-    log.write('\n# Detecting potential mismatches\n')
+    oprint('Detecting potential polymorphisms\n', 'green')
+    log.write('\n# Detecting potential polymorphisms\n')
     for name, path in datasets:
-        mkdir(os.path.join(dir, 'data', name, 'combinations_a'))
         sys.stdout.write('%s ' % name)
         sys.stdout.flush()
-        command = [os.path.join(script_path, 'potential_mismatches.py'),
+        command = [os.path.join(script_path, 'potential_polymorphisms.py'),
                    '-v', os.path.join(dir, 'data', name, 'alignment', 'v_alignment.csv'),
                    '-s', os.path.join(dir, 'data', name, 'alignment', 'segment_coverage.csv'),
-                   '-o', os.path.join(dir, 'data', name, 'combinations_a', 'potential_mismatches.csv'),
+                   '-o', os.path.join(dir, 'data', name, 'alignment', 'potential.csv'),
                    '--range', args.range[0], args.range[1],
                    '--coverage', args.segment_coverage,
-                   '--rate', args.mismatch_rate]
+                   '--bad', args.mismatch_rate[0],
+                   '--good', args.mismatch_rate[1],
+                   '--mult', args.mult,
+                   '--nth', args.nth,
+                   '--radius', args.radius]
         command = [str(x) for x in command]
         log.write('\t%s\n' % ' '.join(command))
         if subprocess.run(command).returncode:
@@ -130,8 +133,12 @@ def potential_mismatches(args, log, datasets):
     sys.stdout.write('\n')
 
 
-def combinations_dirname(i):
+def working_dirname(i):
     from string import ascii_lowercase
+
+    if i == -1:
+        return 'alignment'
+
     n = len(ascii_lowercase)
 
     if i < n:
@@ -141,59 +148,38 @@ def combinations_dirname(i):
     return 'combinations_' + suffix
 
 
-def combinations(args, log, datasets, iteration, detection_coverage):
+def combinations(args, log, datasets, iteration, last):
     dir = args.output
     script_path = os.path.dirname(__file__)
 
-    comb_dir = combinations_dirname(iteration)
+    prev_dir = working_dirname(iteration - 1)
+    comb_dir = working_dirname(iteration)
 
-    oprint('Combining potential mismatches. ', 'green')
+    oprint('Combining potential polymorphisms. ', 'green')
     oprint('Iteration %d\n' % (iteration + 1), 'cyan')
-    log.write('\n# Combining potential mismatches. Iteration %d\n' % (iteration + 1))
+    log.write('\n# Combining potential polymorphisms. Iteration %d\n' % (iteration + 1))
 
     for name, path in datasets:
+        mkdir(os.path.join(dir, 'data', name, comb_dir))
         sys.stdout.write('%s ' % name)
         sys.stdout.flush()
         command = [os.path.join(script_path, 'combinations.py'),
                    '-v', os.path.join(dir, 'data', name, 'alignment', 'v_alignment.csv'),
                    '-j', os.path.join(dir, 'data', name, 'alignment', 'j_hit.csv'),
-                   '-m', os.path.join(dir, 'data', name, comb_dir, 'potential_mismatches.csv'),
-                   '-o', os.path.join(dir, 'data', name, comb_dir, 'combinations.csv'),
-                   '--length', args.length,
-                    '--cov-single-j', detection_coverage, '--cov-mult-j', detection_coverage]
+                   '-m', os.path.join(dir, 'data', name, prev_dir, 'potential.csv'),
+                   '-c', os.path.join(dir, 'data', name, comb_dir, 'combinations.csv')]
+        if not last:
+            command += ['-p', os.path.join(dir, 'data', name, comb_dir, 'potential.csv'),
+                        '-e', os.path.join(dir, 'data', name, comb_dir, 'expanded.csv')]
+        command += ['--length', args.length]
 
-        command = [str(x) for x in command]
-        log.write('\t%s\n' % ' '.join(command))
-        if subprocess.run(command).returncode:
-            rc_fail()
+        if last:
+            command += ['--detection-cov', 0]
+        else:
+            command += ['--detection-cov', args.detection_coverage,
+                        '--expansion-cov', args.expansion_coverage,
+                        '--rate', args.expansion_rate]
 
-    sys.stdout.write('\n')
-
-
-def expand_mismatches(args, log, datasets, iteration):
-    dir = args.output
-    script_path = os.path.dirname(__file__)
-
-    oprint('Expanding combinations. ', 'green')
-    oprint('Iteration %d\n' % (iteration + 1), 'cyan')
-    log.write('\n# Expanding combinations. Iteration %d\n' % (iteration + 1))
-
-    prev_dir = combinations_dirname(iteration)
-    next_dir = combinations_dirname(iteration + 1)
-
-    for name, path in datasets:
-        mkdir(os.path.join(dir, 'data', name, next_dir))
-        sys.stdout.write('%s ' % name)
-        sys.stdout.flush()
-        command = [os.path.join(script_path, 'expand_potential_mismatches.py'),
-                   '-v', os.path.join(dir, 'data', name, 'alignment', 'v_alignment.csv'),
-                   '-m', os.path.join(dir, 'data', name, prev_dir, 'potential_mismatches.csv'),
-                   '-c', os.path.join(dir, 'data', name, prev_dir, 'combinations.csv'),
-                   '-o', os.path.join(dir, 'data', name, next_dir, 'potential_mismatches.csv'),
-                   '-e', os.path.join(dir, 'data', name, next_dir, 'expanded_mismatches.csv'),
-                   '--range', args.range[0], args.range[1],
-                   '--coverage', args.expansion_coverage,
-                   '--rate', args.expansion_rate]
         command = [str(x) for x in command]
         log.write('\t%s\n' % ' '.join(command))
         if subprocess.run(command).returncode:
@@ -312,13 +298,10 @@ def run(args, human_args):
             v_alignment(args, log, datasets)
         
         potential_mismatches(args, log, datasets)
+        for i in range(args.detection_cycles):
+            combinations(args, log, datasets, i, i == args.detection_cycles - 1)
 
-        for i in range(args.expansion_cycles):
-            combinations(args, log, datasets, i, args.detection_coverage)
-            expand_mismatches(args, log, datasets, i)
-        combinations(args, log, datasets, args.expansion_cycles, 0)
-
-        group_allelic(args, log, datasets, combinations_dirname(args.expansion_cycles))
+        group_allelic(args, log, datasets, working_dirname(args.detection_cycles - 1))
         generate(args, log, datasets)
 
         seconds = time.perf_counter() - start
@@ -356,32 +339,51 @@ def main():
                            type=int, metavar='Int', default=9)
     human_args += [('Input format', None), ('V column', 'v_col'), ('J column', 'j_col')]
 
-    mismatch_args = parser.add_argument_group('Mismatch detection')
-    mismatch_args.add_argument('--range', help='Positions range (default: [60, 290])',
+    mismatch_args = parser.add_argument_group('Polymorphisms detection')
+    mismatch_args.add_argument('--range', help='Positions range (default: 60, 290)',
                                metavar=('Int', 'Int'), nargs=2, default=[60, 290], type=int)
     mismatch_args.add_argument('--segment-coverage', help='Segment coverage threshold (default: 200)',
                                type=int, default=200, metavar='Int')
-    mismatch_args.add_argument('--mismatch-rate', help='Mismatch rate threshold (default: 0.1)',
-                               type=float, default=0.1, metavar='Float')
-    human_args += [('Mismatch detection', None), ('Range', 'range'), ('Segment coverage', 'segment_coverage'),
-                   ('Mismatch rate', 'mismatch_rate')]
+    mismatch_args.add_argument('--mismatch-rate', nargs=2, metavar='Float', default=[0.05, 0.15], type=float,
+                               help='Two values: <bad-rate> <good-rate>\n'
+                                    'mismatches with rate lower than <bad-rate> are discarded\n'
+                                    'mismatches with rate higher than <good-rate> are selected\n'
+                                    '(default: 0.05 0.15)')
+    mismatch_args.add_argument('--bad-coverage', metavar='Int', type=int, default=20,
+                               help='Polymorphisms with coverage less than <--bad-coverage>\n'
+                                    'are discarded (default: 20)')
+    mismatch_args.add_argument('--mult', metavar='Float', type=float, default=4,
+                               help='Polymorphisms with rate between <bad-rate> <good-rate>\n'
+                                    'should appear <--mult> times more frequent than the <--nth>\n'
+                                    'frequent polymorphism in the neighborhood (default: 4)')
+    mismatch_args.add_argument('--nth', metavar='Int', type=int, default=3,
+                               help='Nth frequent polymorphism in the neighborhood for comparison\n'
+                                    '0 is the most frequent (will never trigger)\n'
+                                    '<--radius> : median\n'
+                                    '2 * <--radius> : the least frequent\n'
+                                    '(default: 3)')
+    mismatch_args.add_argument('--radius', metavar='Int', type=int, default=5,
+                              help='Neighborhood radius (default: 5)')
+    human_args += [('Polymorphisms detection', None), ('Range', 'range'),
+                   ('Segment coverage', 'segment_coverage'), ('Mismatch rate', 'mismatch_rate'),
+                   ('Bad coverage', 'bad_coverage'), ('Multiplication', 'mult'),
+                   ('Nth neighbor', 'nth'), ('Neighborhood radius', 'radius')]
 
     comb_args = parser.add_argument_group('Combination detection and expansion')
     comb_args.add_argument('--length', help='Min difference from existing segment (default: 4)',
                            type=int, default=4, metavar='Int')
     comb_args.add_argument('--detection-coverage', help='Min coverage to detect a combination (default: 15)',
                            type=int, default=15, metavar='Int')
-    comb_args.add_argument('--expansion-cycles', help='Number of combination expansion\n'
-                                                     'cycles (default: 1)',
-                          type=int, default=1, metavar='Int')
+    comb_args.add_argument('--detection-cycles', type=int, default=2, metavar='Int',
+                           help='Number of combination detection cycles (default: 2)')
     comb_args.add_argument('--expansion-coverage',
-                          help='Min combination coverage during expansion (default: 50)',
-                          type=int, default=50, metavar='Int')
-    comb_args.add_argument('--expansion-rate', help='Mismatch coverage threshold (ratio\n'
-                                                   'to combination coverage) (default: 0.9)',
-                          type=float, default=0.9, metavar='Float')
+                           help='Min combination coverage during expansion (default: 50)',
+                           type=int, default=50, metavar='Int')
+    comb_args.add_argument('--expansion-rate', type=float, default=0.9, metavar='Float',
+                           help='Polymorphism should appear together with combination more often\n'
+                           'than <--expansion-rate> * <combination coverage> (default: 0.9)')
     human_args += [('Combination detection and expansion', None), ('Length', 'length'),
-                   ('Detection coverage', 'detection_coverage'), ('Expansion cycles', 'expansion_cycles'),
+                   ('Detection coverage', 'detection_coverage'), ('Detection cycles', 'detection_cycles'),
                    ('Expansion coverage', 'expansion_coverage'), ('Expansion rate', 'expansion_rate')]
 
     filter_args = parser.add_argument_group('Segments filtering and grouping')

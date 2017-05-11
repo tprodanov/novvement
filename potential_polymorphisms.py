@@ -142,8 +142,8 @@ def main():
                                      '0 is the most frequent (useless)\n'
                                      '<--radius> : median\n'
                                      '2 * <--radius> : the least frequent\n'
-                                     '(default: 3)',
-                       type=int, default=3, metavar='Int')
+                                     '(default: 2)',
+                       type=int, default=2, metavar='Int')
     neigh.add_argument('--radius', help='Neighborhood radius (default: 5)',
                        type=int, default=5, metavar='Int')
 

@@ -168,7 +168,7 @@ def write_potential(segments, threshold, rate, potential_outp, expanded_outp):
 def main():
     parser = argparse.ArgumentParser(description='Combine potential mismatches into combinations',
                                      formatter_class=argparse.RawTextHelpFormatter, add_help=False,
-                                     usage='%(prog)s -v File -j File -m File -c File [-p File [-e File]] [args]')
+                                     usage='%(prog)s -v File -j File -m File [-c File] [-p File [-e File]] [args]')
     input_files = parser.add_argument_group('Input files')
     input_files.add_argument('-v', '--v-alignment', help='Csv file containig V alignment',
                              type=argparse.FileType(), required=True, metavar='File')
@@ -179,7 +179,7 @@ def main():
 
     output_files = parser.add_argument_group('Output files')
     output_files.add_argument('-c', '--combinations', help='Csv combinations output',
-                              type=argparse.FileType('w'), required=True, metavar='File')
+                              type=argparse.FileType('w'), metavar='File')
     output_files.add_argument('-p', '--potential', type=argparse.FileType('w'),
                               required=False, metavar='File',
                               help='Csv file with expanded potential polymorphisms (optional)')
@@ -187,7 +187,7 @@ def main():
                               default='/dev/null', metavar='File',
                               help='Only novel polymorphisms (only if -p File, optional)')
 
-    det_args = parser.add_argument_group('Combinations detection')
+    det_args = parser.add_argument_group('Combinations detection (only if -c File)')
     det_args.add_argument('--length', default=4, type=int, metavar='Int',
                           help='Min combination length (default: 4)')
     det_args.add_argument('--detection-cov', default=15, type=int, metavar='Int',
@@ -216,7 +216,8 @@ def main():
         args.range = [-float('inf'), float('inf')]
 
     load_v_alignment(args.v_alignment, segments, j_hits, args.range)
-    write_combinations(segments, args.length, args.detection_cov, args.combinations)
+    if args.combinations:
+        write_combinations(segments, args.length, args.detection_cov, args.combinations)
 
     if args.potential:
         write_potential(segments, args.expansion_cov, args.rate,

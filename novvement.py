@@ -122,6 +122,7 @@ def potential_mismatches(args, log, datasets):
                    '--coverage', args.segment_coverage,
                    '--bad', args.mismatch_rate[0],
                    '--good', args.mismatch_rate[1],
+                   '--bad-cov', args.bad_coverage,
                    '--mult', args.mult,
                    '--nth', args.nth,
                    '--radius', args.radius]
@@ -166,17 +167,14 @@ def combinations(args, log, datasets, iteration, last):
         command = [os.path.join(script_path, 'combinations.py'),
                    '-v', os.path.join(dir, 'data', name, 'alignment', 'v_alignment.csv'),
                    '-j', os.path.join(dir, 'data', name, 'alignment', 'j_hit.csv'),
-                   '-m', os.path.join(dir, 'data', name, prev_dir, 'potential.csv'),
-                   '-c', os.path.join(dir, 'data', name, comb_dir, 'combinations.csv')]
-        if not last:
-            command += ['-p', os.path.join(dir, 'data', name, comb_dir, 'potential.csv'),
-                        '-e', os.path.join(dir, 'data', name, comb_dir, 'expanded.csv')]
-        command += ['--length', args.length]
-
+                   '-m', os.path.join(dir, 'data', name, prev_dir, 'potential.csv')]
         if last:
-            command += ['--detection-cov', 0]
+            command += ['-c', os.path.join(dir, 'data', name, comb_dir, 'combinations.csv'),
+                        '--detection-cov', 0,
+                        '--length', args.length]
         else:
-            command += ['--detection-cov', args.detection_coverage,
+            command += ['-p', os.path.join(dir, 'data', name, comb_dir, 'potential.csv'),
+                        '-e', os.path.join(dir, 'data', name, comb_dir, 'expanded.csv'),
                         '--expansion-cov', args.expansion_coverage,
                         '--rate', args.expansion_rate]
 
@@ -298,10 +296,10 @@ def run(args, human_args):
             v_alignment(args, log, datasets)
         
         potential_mismatches(args, log, datasets)
-        for i in range(args.detection_cycles):
-            combinations(args, log, datasets, i, i == args.detection_cycles - 1)
+        for i in range(args.cycles):
+            combinations(args, log, datasets, i, i == args.cycles - 1)
 
-        group_allelic(args, log, datasets, working_dirname(args.detection_cycles - 1))
+        group_allelic(args, log, datasets, working_dirname(args.cycles - 1))
         generate(args, log, datasets)
 
         seconds = time.perf_counter() - start
@@ -356,12 +354,12 @@ def main():
                                help='Polymorphisms with rate between <bad-rate> <good-rate>\n'
                                     'should appear <--mult> times more frequent than the <--nth>\n'
                                     'frequent polymorphism in the neighborhood (default: 4)')
-    mismatch_args.add_argument('--nth', metavar='Int', type=int, default=3,
+    mismatch_args.add_argument('--nth', metavar='Int', type=int, default=2,
                                help='Nth frequent polymorphism in the neighborhood for comparison\n'
                                     '0 is the most frequent (will never trigger)\n'
                                     '<--radius> : median\n'
                                     '2 * <--radius> : the least frequent\n'
-                                    '(default: 3)')
+                                    '(default: 2)')
     mismatch_args.add_argument('--radius', metavar='Int', type=int, default=5,
                               help='Neighborhood radius (default: 5)')
     human_args += [('Polymorphisms detection', None), ('Range', 'range'),
@@ -372,18 +370,15 @@ def main():
     comb_args = parser.add_argument_group('Combination detection and expansion')
     comb_args.add_argument('--length', help='Min difference from existing segment (default: 4)',
                            type=int, default=4, metavar='Int')
-    comb_args.add_argument('--detection-coverage', help='Min coverage to detect a combination (default: 15)',
-                           type=int, default=15, metavar='Int')
-    comb_args.add_argument('--detection-cycles', type=int, default=2, metavar='Int',
-                           help='Number of combination detection cycles (default: 2)')
+    comb_args.add_argument('--cycles', type=int, default=2, metavar='Int',
+                           help='Number of combination detection and expansion cycles (default: 2)')
     comb_args.add_argument('--expansion-coverage',
                            help='Min combination coverage during expansion (default: 50)',
                            type=int, default=50, metavar='Int')
     comb_args.add_argument('--expansion-rate', type=float, default=0.9, metavar='Float',
                            help='Polymorphism should appear together with combination more often\n'
                            'than <--expansion-rate> * <combination coverage> (default: 0.9)')
-    human_args += [('Combination detection and expansion', None), ('Length', 'length'),
-                   ('Detection coverage', 'detection_coverage'), ('Detection cycles', 'detection_cycles'),
+    human_args += [('Combination detection and expansion', None), ('Length', 'length'), ('Cycles', 'cycles'),
                    ('Expansion coverage', 'expansion_coverage'), ('Expansion rate', 'expansion_rate')]
 
     filter_args = parser.add_argument_group('Segments filtering and grouping')

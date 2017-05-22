@@ -35,6 +35,8 @@ def log_header(log, args, human_args):
             v = args[v]
             log.write('#\t\t%s: %s\n' % (k, v.name if isinstance(v, io.IOBase) else v))
 
+    log.write('#\n# Start: %s\n#\n' % datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')) 
+
     for line in __version__.splitlines():
         log.write('# %s\n' % line)
     log.write('\n')
@@ -95,7 +97,7 @@ def v_alignment(args, log, datasets):
         sys.stdout.write('%s ' % name)
         sys.stdout.flush()
         command = [os.path.join(script_path, 'v_alignment_mismatches.py'),
-                   '-i', os.path.join(path, 'v_alignments.fa'),
+                   '-i', os.path.join(path, args.v_align_name),
                    '-o', os.path.join(dir, 'data', name, 'alignment', 'v_alignment.csv'),
                    '--mismatches-only']
         log.write('\t%s\n' % ' '.join(command))
@@ -175,6 +177,7 @@ def combinations(args, log, datasets, iteration, last):
         else:
             command += ['-p', os.path.join(dir, 'data', name, comb_dir, 'potential.csv'),
                         '-e', os.path.join(dir, 'data', name, comb_dir, 'expanded.csv'),
+                        '--range', args.range[0], args.range[1],
                         '--expansion-cov', args.expansion_coverage,
                         '--rate', args.expansion_rate]
 
@@ -335,7 +338,10 @@ def main():
     input_fmt.add_argument('--j-col', help='Number of a J-hit column in \n'
                                            '<alignment_info.csv> (default: 9)',
                            type=int, metavar='Int', default=9)
-    human_args += [('Input format', None), ('V column', 'v_col'), ('J column', 'j_col')]
+    input_fmt.add_argument('--v-align-name', metavar='Str', default='v_alignments.fa',
+                           help='Name of a V alignment file (default: v_alignments.fa)')
+    human_args += [('Input format', None), ('V column', 'v_col'), ('J column', 'j_col'),
+                   ('V alignment file name', 'v_align_name)]
 
     mismatch_args = parser.add_argument_group('Polymorphisms detection')
     mismatch_args.add_argument('--range', help='Positions range (default: 60, 290)',

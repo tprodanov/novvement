@@ -38,7 +38,7 @@ def add_read(fasta, segments_coverage, mismatches, combinations, mut_combination
     read = next(fasta)
     segment = next(fasta)
 
-    segment_name = re.search('GENE:([^|]*)\|', segment.name).group(1)
+    segment_name = re.search('GENE:([^|]*)', segment.name).group(1)
 
     m = re.search('-M([0-9]*)', segment_name)
     if not m:

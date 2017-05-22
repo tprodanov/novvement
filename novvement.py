@@ -341,7 +341,7 @@ def main():
     input_fmt.add_argument('--v-align-name', metavar='Str', default='v_alignments.fa',
                            help='Name of a V alignment file (default: v_alignments.fa)')
     human_args += [('Input format', None), ('V column', 'v_col'), ('J column', 'j_col'),
-                   ('V alignment file name', 'v_align_name)]
+                   ('V alignment file name', 'v_align_name')]
 
     mismatch_args = parser.add_argument_group('Polymorphisms detection')
     mismatch_args.add_argument('--range', help='Positions range (default: 60, 290)',

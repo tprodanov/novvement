@@ -175,8 +175,8 @@ class NovelSegment:
         assert isinstance(other, NovelSegment)
         
         if dist > NovelSegment.hamming_threshold \
-                and dist > (1 - NovelSegment.shared_polymorphism_rate
-                               * max(self.nearest_dist, other.nearest_dist)):
+                and dist > (1 - NovelSegment.shared_polymorphism_rate)
+                               * max(self.nearest_dist, other.nearest_dist):
             return False
         self.neighbors.append((other, dist))
         other.neighbors.append((self, dist))
@@ -320,6 +320,7 @@ def write_groups(groups, args):
     args.components.write('# %s\n# Components info\n' % ' '.join(sys.argv))
     
     new_groups = []
+    print(len(groups))
     for group in groups:
         group.sort(key=NovelSegment.decoration, reverse=True)
         summed_group = NovelSegment(group[0])

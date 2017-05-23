@@ -275,6 +275,10 @@ def generate(args, log, datasets):
 
 
 def run(args, human_args):
+    if args.range[0] <= 0:
+        eprint('Invalid left margin: --range %d %d\n' % tuple(args.range), 'red')
+        exit(1)
+
     start = time.perf_counter()
     dir = args.output
     mkdir(args.output)

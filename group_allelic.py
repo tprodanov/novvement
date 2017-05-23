@@ -175,7 +175,7 @@ class NovelSegment:
         assert isinstance(other, NovelSegment)
         
         if dist > NovelSegment.hamming_threshold \
-                and dist > (1 - NovelSegment.shared_polymorphism_rate)
+                and dist > (1 - NovelSegment.shared_polymorphism_rate) \
                                * max(self.nearest_dist, other.nearest_dist):
             return False
         self.neighbors.append((other, dist))

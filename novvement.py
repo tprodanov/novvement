@@ -241,7 +241,7 @@ def generate(args, log, datasets):
         grep_command = ('grep', '-Pv', '^([\\s#]|$)')
         cut_command = ('cut', '-f2,5')
         sed_command = ('sed', 's/\\./\\t/')
-        awk_command = ('awk', '$1 > 2 {OFS="\\t"; t=$1; $1=$2; $2=$3; $3=t; print}')
+        awk_command = ('awk', '$1 >= %d {OFS="\\t"; t=$1; $1=$2; $2=$3; $3=t; print}' % args.min_significance)
 
         log.write('\tcat %s | %s | %s | %s | %s > %s\n'
                   % (inp_name, "%s %s '%s'" % grep_command, ' '.join(cut_command),

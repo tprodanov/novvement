@@ -206,14 +206,13 @@ def group_allelic(args, log, datasets, last_dir):
     log.write('\n# Grouping allelic variations\n')
     command = [os.path.join(script_path, 'group_allelic.py'),
                '-d', filename,
-               '-v', args.v_segments,
+               '-v', *args.v_segments,
                '-o', os.path.join(dir, 'group', 'short.txt'),
                '-f', os.path.join(dir, 'group', 'full.txt'),
                '-c', os.path.join(dir, 'group', 'components.txt'),
                '--range', args.range[0], args.range[1],
                '--source-dist', args.length,
                '--j-coverage', args.j_coverage,
-               '--dat-coverage', args.dat_coverage,
                '--hamming', args.hamming,
                '--shared', args.shared]
     command = [str(x) for x in command]
@@ -235,13 +234,13 @@ def generate(args, log, datasets):
     log.write('\n# Filtered combinations at %s\n' % out_name)
 
     with open(inp_name) as inp, open(out_name, 'w') as outp:
-        outp.write('segment\tcombination\tsignificance\n')
+        outp.write('segment\tsignificance\tlength\tcombination\n')
         outp.flush()
 
         grep_command = ('grep', '-Pv', '^([\\s#]|$)')
         cut_command = ('cut', '-f2,5')
-        sed_command = ('sed', 's/\\./\\t/')
-        awk_command = ('awk', '$1 >= %d {OFS="\\t"; t=$1; $1=$2; $2=$3; $3=t; print}' % args.min_significance)
+        sed_command = ('sed', 's/(\\|)/\\t/g')
+        awk_command = ('awk', '$1 >= %d {OFS="\\t"; t=$1; $1=$2; $2=t;  print}' % args.min_significance)
 
         log.write('\tcat %s | %s | %s | %s | %s > %s\n'
                   % (inp_name, "%s %s '%s'" % grep_command, ' '.join(cut_command),
@@ -262,7 +261,7 @@ def generate(args, log, datasets):
 
     command = [os.path.join(script_path, 'make_segments.py'),
                '-i', os.path.join(dir, 'combinations.csv'),
-               '-v', args.v_segments,
+               '-v', *args.v_segments,
                '-o', os.path.join(dir, 'segments.fa')]
     command = [str(x) for x in command]
     log.write('\t%s\n' % ' '.join(command))
@@ -324,8 +323,8 @@ def main():
     io_args.add_argument('-i', '--input', required=True, metavar='File', type=argparse.FileType(),
                          help='File with lines <name> <path to cdr folder>.\n'
                               'Should contain: v_alignments.fa, alignment_info.csv')
-    io_args.add_argument('-v', '--v-segments', required=True, metavar='File',
-                         help='Fasta file containing V segments')
+    io_args.add_argument('-v', '--v-segments', required=True, metavar='File', nargs='+',
+                         help='Fasta file containing V segments (can be several files)')
     io_args.add_argument('-o', '--output', help='Output directory', required=True, metavar='Dir')
     io_args.add_argument('-f', '--force', help='Override files in output directory', action='store_true')
     io_args.add_argument('--start', help='Start from a specific point in a pipeline:\n'
@@ -397,9 +396,6 @@ def main():
     filter_args.add_argument('--j-coverage', metavar='Int', type=int, default=50,
                              help='J segment covers novel segment if they appear\n'
                                   'together at least <--j-coverage> times (default: 50)')
-    filter_args.add_argument('--dat-coverage', metavar='Int', type=int, default=50,
-                             help='Novel segment is covered by a dataset if they appear\n'
-                                  'together at least <--dat-coverage> times (default: 50)')
     filter_args.add_argument('--hamming', metavar='Int', type=int, default=2,
                              help='If distance between two novel segments is at most\n'
                                   '<--hamming> - these segments will be placed in\n'
@@ -409,7 +405,7 @@ def main():
                                   'if they share <--shared> of their\n'
                                   'polymorphisms (default: 0.9)')
     human_args += [('Segments filtering and grouping', None), ('Min significance', 'min_significance'),
-                   ('J coverage', 'j_coverage'), ('Dataset coverage', 'dat_coverage'),
+                   ('J coverage', 'j_coverage'),
                    ('Hamming distance', 'hamming'), ('Shared polymorphisms', 'shared')]
 
     other = parser.add_argument_group('Other arguments')

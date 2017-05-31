@@ -30,7 +30,7 @@ def randomize_combinations(args):
     source = [(segment.seq[l:r], segment.name) for segment in segments.values()]
 
     outp.write('# %s\n' % ' '.join(sys.argv))
-    outp.write('segment\tsignificance\tlength\tcombinations\tj_hit\tdatasets\n')
+    outp.write('segment\tsignificance\tlength\tcombination\n')
 
     while next(inp).startswith('#'):
         pass
@@ -41,7 +41,7 @@ def randomize_combinations(args):
         length = int(line[2])
         segment_seq = segments[segment].seq
         comb = random_combination(l, min(r, len(segment_seq) + 1), segment_seq, length, args.min_dist, source)
-        outp.write('%s\t0\t%d\t%s\t*\t*\n' % (segment, length, comb))
+        outp.write('%s\t0\t%d\t%s\n' % (segment, length, comb))
 
 
 def main():

@@ -50,7 +50,7 @@ def generate(segments, combinations, outp):
     for line in combinations:
         split_line = line.strip().split('\t')
         segment = split_line[0]
-        combination = split_line[1]
+        combination = split_line[3]
         generate_and_write(segments[segment], combination, i, outp)
         i += 1
 
@@ -61,8 +61,9 @@ def main():
     io_args = parser.add_argument_group('Input/output arguments')
     io_args.add_argument('-i', '--input', help='Input file with lines <segment> <mismatches>',
                          type=argparse.FileType('r'), required=True, metavar='File')
-    io_args.add_argument('-v', '--v-segments', help='V segments fasta file', type=argparse.FileType('r'),
-                         dest='v_segments', required=True, metavar='File')
+    io_args.add_argument('-v', '--v-segments', help='V segments fasta file/files',
+                         type=argparse.FileType('r'),
+                         dest='v_segments', required=True, metavar='File', nargs='+')
     io_args.add_argument('-o', '--output', help='Output fasta', type=argparse.FileType('w'),
                          required=True, metavar='File')
     io_args.add_argument('--discard-original', help='Do not include original V segments',
@@ -74,7 +75,9 @@ def main():
 
     args = parser.parse_args()
 
-    segments = read_segments(args.v_segments, None if args.discard_original else args.output)
+    import itertools
+    segments = read_segments(itertools.chain(*args.v_segments),
+                             None if args.discard_original else args.output)
     generate(segments, args.input, args.output)
 
 

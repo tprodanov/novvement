@@ -113,7 +113,6 @@ class NovelSegment:
     left_margin = None
     right_margin = None
     j_coverage = None
-    dataset_coverage = None
     segments = None
     source = None
     nicknames = Counter()
@@ -144,10 +143,6 @@ class NovelSegment:
         self.nickname = '%s|%d%s' % (self.nearest_segment, self.nearest_dist,
                                      letter(NovelSegment.nicknames[nearest]))
         NovelSegment.nicknames[nearest] += 1
-
-    def covered_datasets(self):
-        return count_covered(map(attrgetter('coverage'), self.datasets.values()),
-                             NovelSegment.dataset_coverage)
 
     def covered_j(self):
         return sum(map(attrgetter('covered_j'), self.datasets.values()))
@@ -196,13 +191,13 @@ class NovelSegment:
         return ','.join(res)
 
     def decoration(self):
-        return self.covered_datasets() + self.covered_j()
+        return self.covered_j()
 
     def __str__(self):
         res = []
         res.append(self.nickname)
         res.append(str(self.decoration()))
-        res.append('%d %d %d' % (self.covered_datasets(), self.covered_j(), self.coverage()))
+        res.append(str(self.coverage()))
         res.append(','.join(map(str, sorted(self.datasets.values(),
                                             key=SegmentInDataset.decoration, reverse=True))))
 
@@ -215,7 +210,8 @@ class NovelSegment:
         elif self.neighbors is not None:
             res.append('N:%d' % len(self.neighbors))
 
-        res.append('%s.%s' % (self.nearest_segment, self.combination()))
+        combination = self.combination()
+        res.append('%s(%d)%s' % (self.nearest_segment, combination.count(':'), combination))
         return '\t'.join(res)
 
     def full_info(self, include_original):
@@ -320,7 +316,6 @@ def write_groups(groups, args):
     args.components.write('# %s\n# Components info\n' % ' '.join(sys.argv))
     
     new_groups = []
-    print(len(groups))
     for group in groups:
         group.sort(key=NovelSegment.decoration, reverse=True)
         summed_group = NovelSegment(group[0])
@@ -334,7 +329,8 @@ def write_groups(groups, args):
 
 
 def run(args):
-    segments = combinations_to_segments.read_segments(args.v_segments)
+    import itertools
+    segments = combinations_to_segments.read_segments(itertools.chain(*args.v_segments))
     l, r = args.range
     l -= 1
 
@@ -343,7 +339,6 @@ def run(args):
     NovelSegment.left_margin = l
     NovelSegment.right_margin = r
     NovelSegment.j_coverage = args.j_coverage
-    NovelSegment.dataset_coverage = args.dat_coverage
     NovelSegment.segments = segments
     NovelSegment.source = source
     NovelSegment.hamming_threshold = args.hamming
@@ -363,7 +358,7 @@ def main():
     in_args = parser.add_argument_group('Input arguments')
     in_args.add_argument('-d', '--datasets', help='Input: file with lines <name> <combinations.csv>',
                          type=argparse.FileType(), required=True, metavar='File')
-    in_args.add_argument('-v', '--v-segments', help='Input: source V segments',
+    in_args.add_argument('-v', '--v-segments', help='Input: source V segments', nargs='+',
                          type=argparse.FileType(), required=True, metavar='File')
 
     out_args = parser.add_argument_group('Output arguments')
@@ -384,9 +379,6 @@ def main():
     filter_args.add_argument('--j-coverage', type=int, default=50, metavar='Int',
                              help='With this coverage J segment will be\n'
                                   'counted as significant (default: 50)')
-    filter_args.add_argument('--dat-coverage', type=int, default=50, metavar='Int',
-                             help='Novel segment appear in the dataset if it\n'
-                                  'has at least this coverage (default: 50)')
     filter_args.add_argument('--hamming', type=int, default=2, metavar='Int',
                              help='If distance between two novel segments is at\n'
                                   'most <--hamming> - these segments will be\n'

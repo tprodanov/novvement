@@ -33,7 +33,11 @@ def log_header(log, args, human_args):
             log.write('#\t%s\n' % k)
         else:
             v = args[v]
-            log.write('#\t\t%s: %s\n' % (k, v.name if isinstance(v, io.IOBase) else v))
+            if isinstance(v, list) or isinstance(v, tuple):
+                v = ', '.join(str(x) for x in v)
+            elif isinstance(v, io.IOBase):
+                v = v.name
+            log.write('#\t\t%s: %s\n' % (k, v))
 
     log.write('#\n# Start: %s\n#\n' % datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')) 
 

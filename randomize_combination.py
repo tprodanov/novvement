@@ -40,7 +40,8 @@ def randomize_combinations(args):
         segment = line[0]
         length = int(line[2])
         segment_seq = segments[segment].seq
-        comb = random_combination(l, min(r, len(segment_seq) + 1), segment_seq, length, args.min_dist, source)
+        comb = random_combination(l, min(r, len(segment_seq) + 1), segment_seq,
+                                  length, length, source)
         outp.write('%s\t0\t%d\t%s\n' % (segment, length, comb))
 
 
@@ -58,8 +59,8 @@ def main():
     opt_args = parser.add_argument_group('Optional arguments')
     opt_args.add_argument('--range', help='Positions range (default: [60, 290])', metavar=('Int', 'Int'),
                           nargs=2, default=[60, 290], type=int)
-    opt_args.add_argument('--min-dist', help='Min distance from any V segment (default: 2)',
-                          type=int, metavar='Int', default=2, dest='min_dist')
+#    opt_args.add_argument('--min-dist', help='Min distance from any V segment (default: 2)',
+#                          type=int, metavar='Int', default=2, dest='min_dist')
 
     other = parser.add_argument_group('Other arguments')
     other.add_argument('-h', '--help', action='help', help='Show this help message and exit')

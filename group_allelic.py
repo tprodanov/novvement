@@ -168,10 +168,12 @@ class NovelSegment:
 
     def add_edge_if_needed(self, other, dist):
         assert isinstance(other, NovelSegment)
+
+        import math
         
         if dist > NovelSegment.hamming_threshold \
-                and dist > (1 - NovelSegment.shared_polymorphism_rate) \
-                               * max(self.nearest_dist, other.nearest_dist):
+                and dist > math.ceil((1 - NovelSegment.shared_polymorphism_rate) \
+                               * max(self.nearest_dist, other.nearest_dist)):
             return False
         self.neighbors.append((other, dist))
         other.neighbors.append((self, dist))
@@ -233,6 +235,7 @@ def load_novel_segments(f, dataset_name, novel, min_dist):
         try:
             novel_segment = SegmentInDataset(dataset_name, line)
         except UnknownSegment as err:
+            # print('Error')
             # TODO Warning
             continue
         distances = []

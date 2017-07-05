@@ -80,16 +80,12 @@ def validate(args, datasets, log):
             sys.stdout.write('%s ' % name)
             sys.stdout.flush()
 
-            command = [os.path.join(script_path, 'memory_validation.py'),
-                       '-v', os.path.join(datasets_path, path),
+            command = [os.path.join(script_path, 'key_rate.py'),
+                       '-a', os.path.join(datasets_path, path),
                        '-c', args.combinations.name,
                        '-n', '%s-%s' % (individual, name),
-                       '-d', os.path.join(dir, individual, name),
-                       '--range', args.range[0], args.range[1],
-                       '--neigh', args.neigh,
-                       '--neigh-overhead', args.neigh_overhead,
-                       '--neigh-good', args.neigh_good,
-                       '--neigh-bad', args.neigh_bad]
+                       '-o', os.path.join(dir, individual, name + '.csv'),
+                       '--range', args.range[0], args.range[1]]
             command = list(map(str, command))
             log.write('\t%s\n' % ' '.join(command))
             if subprocess.run(command).returncode:
@@ -110,16 +106,12 @@ def combined_validate(args, datasets, log):
         sys.stdout.flush()
 
         cat_command = ['cat'] + list(map(itemgetter(1), ind_datasets))
-        command = [os.path.join(script_path, 'memory_validation.py'),
-                   '-v', '-',
+        command = [os.path.join(script_path, 'key_rate.py'),
+                   '-a', '-',
                    '-c', args.combinations.name,
                    '-n', individual,
-                   '-d', os.path.join(dir, individual),
-                   '--range', args.range[0], args.range[1],
-                   '--neigh', args.neigh,
-                   '--neigh-overhead', args.neigh_overhead,
-                   '--neigh-good', args.neigh_good,
-                   '--neigh-bad', args.neigh_bad]
+                   '-o', os.path.join(dir, individual, individual + '.csv'),
+                   '--range', args.range[0], args.range[1]]
         command = list(map(str, command))
         log.write('\t%s | %s\n' % (' '.join(cat_command), ' ' .join(command)))
 
@@ -134,7 +126,7 @@ def combined_validate(args, datasets, log):
 
 
 def tail_command(path, log, outp):
-    command = ['tail', '-n+5', path]
+    command = ['tail', '-n+3', path]
     log.write('\t%s >> %s\n' % (' '.join(command), outp.name))
     p = subprocess.Popen(command, stdout=outp)
     p.communicate()
@@ -143,12 +135,11 @@ def tail_command(path, log, outp):
 def combine_segments_summary(args, datasets, log):
     dir = args.output
     log.write('# Combine all segments_summary.csv\n')
-    target = 'segments_summary.csv'
-    with open(os.path.join(dir, target), 'w') as outp:
+    with open(os.path.join(dir, 'summary.csv'), 'w') as outp:
         outp.write('# %s\n' % ' '.join(sys.argv))
         outp.flush()
-        command1 = ['tail', '-n+2', os.path.join(dir, datasets[0][0], target)]
-        command2 = ['head', '-n3']
+        command1 = ['tail', '-n+2', os.path.join(dir, datasets[0][0], datasets[0][0] + '.csv')]
+        command2 = ['head', '-n1']
         log.write('\t%s | %s > %s\n' % (' '.join(command1), ' '.join(command2), outp.name))
         p1 = subprocess.Popen(command1, stdout=subprocess.PIPE)
         p2 = subprocess.Popen(command2, stdin=p1.stdout, stdout=outp)
@@ -158,9 +149,9 @@ def combine_segments_summary(args, datasets, log):
             rc_fail()
 
         for individual, ind_datasets in datasets:
-            tail_command(os.path.join(dir, individual, target), log, outp)
+            tail_command(os.path.join(dir, individual, individual + '.csv'), log, outp)
             for name, _ in ind_datasets:
-                tail_command(os.path.join(dir, individual, name, target), log, outp)
+                tail_command(os.path.join(dir, individual, name + '.csv'), log, outp)
 
 
 def run(args, human_args):
@@ -178,8 +169,6 @@ def run(args, human_args):
         datasets = load_datasets(args.datasets, log)
         for individual, ind_datasets in datasets:
             mkdir(os.path.join(dir, individual))
-            for name, path in ind_datasets:
-                mkdir(os.path.join(dir, individual, name))
 
         validate(args, datasets, log)
         combined_validate(args, datasets, log)
@@ -214,20 +203,7 @@ def main():
     val_args = parser.add_argument_group('Validating arguments')
     val_args.add_argument('--range', help='Positions range (default: [60, 290])',
                           metavar=('Int', 'Int'), nargs=2, default=[60, 290], type=int)
-    val_args.add_argument('--neigh', help='Position neighborhood size (default: 3)',
-                          metavar='Int', default=3, type=int)
-    val_args.add_argument('--neigh-overhead', help='Acceptable mismatch rate overhead\n'
-                                                   'in the position neighborhood (default: 1.1)',
-                          metavar='Float', default=1.1, type=float, dest='neigh_overhead')
-    val_args.add_argument('--neigh-good', help='Position is treated good, if its mismatch rate is\n'
-                                               'less than --neigh-good (default: 0.2)',
-                          metavar='Float', default=0.2, type=float, dest='neigh_good')
-    val_args.add_argument('--neigh-bad', help='Position is treated good, if its mismatch rate is\n'
-                                              'more than --neigh-bad (default: 0.8)',
-                          metavar='Float', default=0.8, type=float, dest='neigh_bad')
-    human_args += [('Validation arguments', None), ('Range', 'range'), ('neighborhood size', 'neigh'),
-                   ('Neighborhood overhead', 'neigh_overhead'), ('Neighborhood: good', 'neigh_good'),
-                   ('Neighborhood: bad', 'neigh_bad')]
+    human_args += [('Validation arguments', None), ('Range', 'range')]
 
     other = parser.add_argument_group('Other arguments')
     other.add_argument('-h', '--help', action='help', help='Show this help message and exit')

@@ -351,22 +351,22 @@ def main():
                    ('V alignment file name', 'v_align_name')]
 
     mismatch_args = parser.add_argument_group('Polymorphisms detection')
-    mismatch_args.add_argument('--range', help='Positions range (default: 60, 290)',
-                               metavar=('Int', 'Int'), nargs=2, default=[60, 290], type=int)
-    mismatch_args.add_argument('--segment-coverage', help='Segment coverage threshold (default: 200)',
-                               type=int, default=200, metavar='Int')
-    mismatch_args.add_argument('--mismatch-rate', nargs=2, metavar='Float', default=[0.05, 0.15], type=float,
+    mismatch_args.add_argument('--range', help='Positions range (default: 40, 290)',
+                               metavar=('Int', 'Int'), nargs=2, default=[40, 290], type=int)
+    mismatch_args.add_argument('--segment-coverage', help='Segment coverage threshold (default: 1)',
+                               type=int, default=1, metavar='Int')
+    mismatch_args.add_argument('--mismatch-rate', nargs=2, metavar='Float', default=[0.1, 0.2], type=float,
                                help='Two values: <bad-rate> <good-rate>\n'
                                     'mismatches with rate lower than <bad-rate> are discarded\n'
                                     'mismatches with rate higher than <good-rate> are selected\n'
-                                    '(default: 0.05 0.15)')
-    mismatch_args.add_argument('--bad-coverage', metavar='Int', type=int, default=20,
+                                    '(default: 0.1 0.2)')
+    mismatch_args.add_argument('--bad-coverage', metavar='Int', type=int, default=30,
                                help='Polymorphisms with coverage less than <--bad-coverage>\n'
-                                    'are discarded (default: 20)')
-    mismatch_args.add_argument('--mult', metavar='Float', type=float, default=4,
+                                    'are discarded (default: 30)')
+    mismatch_args.add_argument('--mult', metavar='Float', type=float, default=7,
                                help='Polymorphisms with rate between <bad-rate> <good-rate>\n'
                                     'should appear <--mult> times more frequent than the <--nth>\n'
-                                    'frequent polymorphism in the neighborhood (default: 4)')
+                                    'frequent polymorphism in the neighborhood (default: 7)')
     mismatch_args.add_argument('--nth', metavar='Int', type=int, default=2,
                                help='Nth frequent polymorphism in the neighborhood for comparison\n'
                                     '0 is the most frequent (will never trigger)\n'
@@ -383,31 +383,31 @@ def main():
     comb_args = parser.add_argument_group('Combination detection and expansion')
     comb_args.add_argument('--length', help='Min difference from existing segment (default: 4)',
                            type=int, default=4, metavar='Int')
-    comb_args.add_argument('--cycles', type=int, default=2, metavar='Int',
-                           help='Number of combination detection and expansion cycles (default: 2)')
+    comb_args.add_argument('--cycles', type=int, default=4, metavar='Int',
+                           help='Number of combination detection and expansion cycles (default: 4)')
     comb_args.add_argument('--expansion-coverage',
                            help='Min combination coverage during expansion (default: 50)',
                            type=int, default=50, metavar='Int')
-    comb_args.add_argument('--expansion-rate', type=float, default=0.9, metavar='Float',
+    comb_args.add_argument('--expansion-rate', type=float, default=0.75, metavar='Float',
                            help='Polymorphism should appear together with combination more often\n'
-                           'than <--expansion-rate> * <combination coverage> (default: 0.9)')
+                           'than <--expansion-rate> * <combination coverage> (default: 0.75)')
     human_args += [('Combination detection and expansion', None), ('Length', 'length'), ('Cycles', 'cycles'),
                    ('Expansion coverage', 'expansion_coverage'), ('Expansion rate', 'expansion_rate')]
 
     filter_args = parser.add_argument_group('Segments filtering and grouping')
-    filter_args.add_argument('--min-significance', help='Min significance (default: 20)',
-                             type=int, metavar='Float', default=20, dest='min_significance')
-    filter_args.add_argument('--j-coverage', metavar='Int', type=int, default=50,
+    filter_args.add_argument('--min-significance', help='Min significance (default: 3)',
+                             type=int, metavar='Float', default=3, dest='min_significance')
+    filter_args.add_argument('--j-coverage', metavar='Int', type=int, default=15,
                              help='J segment covers novel segment if they appear\n'
-                                  'together at least <--j-coverage> times (default: 50)')
-    filter_args.add_argument('--hamming', metavar='Int', type=int, default=2,
+                                  'together at least <--j-coverage> times (default: 15)')
+    filter_args.add_argument('--hamming', metavar='Int', type=int, default=0,
                              help='If distance between two novel segments is at most\n'
                                   '<--hamming> - these segments will be placed in\n'
-                                  'one group (default: 2)')
-    filter_args.add_argument('--shared', metavar='Float', type=float, default=0.9,
+                                  'one group (default: 0)')
+    filter_args.add_argument('--shared', metavar='Float', type=float, default=0.75,
                              help='Two novel segments will be placed in one group\n'
                                   'if they share <--shared> of their\n'
-                                  'polymorphisms (default: 0.9)')
+                                  'polymorphisms (default: 0.75)')
     human_args += [('Segments filtering and grouping', None), ('Min significance', 'min_significance'),
                    ('J coverage', 'j_coverage'),
                    ('Hamming distance', 'hamming'), ('Shared polymorphisms', 'shared')]

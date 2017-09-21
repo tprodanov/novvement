@@ -5,6 +5,7 @@ from collections import Counter
 import sys
 
 from extra._version import __version__
+from extra import nt_string
 
 
 def str_items(items):
@@ -122,7 +123,7 @@ def load_v_alignment(f, segments, j_hits, margins):
         read = split_line[1]
 
         if read != prev_read:
-            if prev_read and segment in segments:
+            if prev_read and segment in segments and prev_read in j_hits:
                 segments[segment].add_read(current_mismatches, j_hits[prev_read])
             prev_read = read
             current_mismatches = []
@@ -135,15 +136,14 @@ def load_v_alignment(f, segments, j_hits, margins):
         if mism_type == 'mismatch' and left <= pos <= right:
             current_mismatches.append((pos, nt))
     
-    if prev_read and segment in segments:
+    if prev_read and segment in segments and prev_read in j_hits:
         segments[segment].add_read(current_mismatches, j_hits[prev_read])
 
 
 def load_j_hits(f):
-    j_hit = dict()
-    for line in f:
-        read_name, j_segment = line.strip().split('\t')
-        j_hit[read_name] = j_segment
+    j_hit = {}
+    for read in nt_string.read_fasta(f):
+        j_hit[read.name[1:]] = read.seq
     return j_hit
 
 
@@ -172,7 +172,7 @@ def main():
     input_files = parser.add_argument_group('Input files')
     input_files.add_argument('-v', '--v-alignment', help='Csv file containig V alignment',
                              type=argparse.FileType(), required=True, metavar='File')
-    input_files.add_argument('-j', '--j-hit', help='File with lines <read name> <j segment>',
+    input_files.add_argument('-j', '--j-hit', help='Fasta file with cdrs',
                              type=argparse.FileType(), required=True, metavar='File')
     input_files.add_argument('-m', '--mismatches', help='Csv file contating potential mismatches',
                              type=argparse.FileType(), required=True, metavar='File')

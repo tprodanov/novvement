@@ -235,7 +235,7 @@ def load_novel_segments(f, dataset_name, novel, min_dist):
         try:
             novel_segment = SegmentInDataset(dataset_name, line)
         except UnknownSegment as err:
-            # print('Error')
+            print(dataset_name, err)
             # TODO Warning
             continue
         distances = []

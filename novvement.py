@@ -50,7 +50,7 @@ def log_header(log, args, human_args):
 def make_datasets_file(dir, log, datasets):
     with open(os.path.join(dir, 'data', 'datasets.csv'), 'w') as f:
         log.write('\n# generate <name> <v_alignment.csv> file (%s)\n' % f.name)
-        for name, _ in datasets:
+        for name, _, _ in datasets:
             f.write('%s %s\n' % (name, os.path.join('data', name, 'alignment', 'v_alignment.csv')))
 
 
@@ -59,12 +59,13 @@ def segment_coverage(args, log, datasets):
     oprint('Segment coverage\n', 'green')
     log.write('\n# Segment coverage\n')
 
-    for name, path in datasets:
-        with open(os.path.join(path, 'alignment_info.csv')) as inp, \
+    for name, v_alignment, cdrs in datasets:
+        with open(v_alignment) as inp, \
                 open(os.path.join(dir, 'data', name, 'alignment', 'segment_coverage.csv'), 'w') as outp:
-            log.write("\tcat %s | cut -f%d | sort | uniq -c | awk '{t = $1; $1 = $2; $2 = t; print}' > %s\n" 
-                      % (inp.name, args.v_col, outp.name))
-            p1 = subprocess.Popen(['cut', '-f', str(args.v_col)], stdin=inp, stdout=subprocess.PIPE)
+            log.write("\tcat %s | sed -n '3~4p' | sed 's/.*GENE:\([^|]*\)|.*/\1/' | sort | uniq -c "
+                      "| awk '{t = $1; $1 = $2; $2 = t; print}' > %s\n"
+                      % (inp.name, outp.name))
+            p1 = subprocess.Popen(['sed', '-n', '3~4 s/.*GENE:\([^|]*\)|.*/\\1/p'], stdin=inp, stdout=subprocess.PIPE)
             p2 = subprocess.Popen(['sort'], stdin=p1.stdout, stdout=subprocess.PIPE)
             p3 = subprocess.Popen(['uniq', '-c'], stdin=p2.stdout, stdout=subprocess.PIPE)
             p4 = subprocess.Popen(['awk', '{t = $1; $1 = $2; $2 = t; print}'], stdin=p3.stdout, stdout=outp)
@@ -76,32 +77,17 @@ def segment_coverage(args, log, datasets):
                 rc_fail()
 
 
-def j_hits(args, log, datasets):
-    dir = args.output
-    oprint('J hit\n', 'green')
-    log.write('\n# J hit\n')
-
-    for name, path in datasets:
-        with open(os.path.join(path, 'alignment_info.csv')) as inp, \
-                open(os.path.join(dir, 'data', name, 'alignment', 'j_hit.csv'), 'w') as outp:
-            log.write("\tcat %s | cut -f1,%d > %s\n" % (inp.name, args.j_col, outp.name))
-            p1 = subprocess.Popen(['cut', '-f1,%d' % args.j_col], stdin=inp, stdout=outp)
-            p1.communicate()
-            if p1.returncode:
-                rc_fail()
-
-
 def v_alignment(args, log, datasets):
     dir = args.output
     script_path = os.path.dirname(__file__)
 
     oprint('V alignment -> csv\n', 'green')
     log.write('\n# V alignment -> csv\n')
-    for name, path in datasets:
+    for name, v_alignment, cdrs in datasets:
         sys.stdout.write('%s ' % name)
         sys.stdout.flush()
         command = [os.path.join(script_path, 'v_alignment_mismatches.py'),
-                   '-i', os.path.join(path, args.v_align_name),
+                   '-i', v_alignment,
                    '-o', os.path.join(dir, 'data', name, 'alignment', 'v_alignment.csv'),
                    '--mismatches-only']
         log.write('\t%s\n' % ' '.join(command))
@@ -117,7 +103,7 @@ def potential_mismatches(args, log, datasets):
 
     oprint('Detecting potential polymorphisms\n', 'green')
     log.write('\n# Detecting potential polymorphisms\n')
-    for name, path in datasets:
+    for name, v_alignment, cdrs in datasets:
         sys.stdout.write('%s ' % name)
         sys.stdout.flush()
         command = [os.path.join(script_path, 'potential_polymorphisms.py'),
@@ -166,13 +152,13 @@ def combinations(args, log, datasets, iteration, last):
     oprint('Iteration %d\n' % (iteration + 1), 'cyan')
     log.write('\n# Combining potential polymorphisms. Iteration %d\n' % (iteration + 1))
 
-    for name, path in datasets:
+    for name, v_alignment, cdrs in datasets:
         mkdir(os.path.join(dir, 'data', name, comb_dir))
         sys.stdout.write('%s ' % name)
         sys.stdout.flush()
         command = [os.path.join(script_path, 'combinations.py'),
                    '-v', os.path.join(dir, 'data', name, 'alignment', 'v_alignment.csv'),
-                   '-j', os.path.join(dir, 'data', name, 'alignment', 'j_hit.csv'),
+                   '-j', cdrs,
                    '-m', os.path.join(dir, 'data', name, prev_dir, 'potential.csv')]
         if last:
             command += ['-c', os.path.join(dir, 'data', name, comb_dir, 'combinations.csv'),
@@ -203,7 +189,7 @@ def group_allelic(args, log, datasets, last_dir):
     filename = os.path.join(dir, 'group', 'paths.txt')
     log.write('\n# Writing paths to combinations -> %s\n' % filename)
     with open(filename, 'w') as f:
-        for name, _ in datasets:
+        for name, _, _ in datasets:
             f.write('%s\t%s\n' % (name,
                 os.path.join('..', 'data', name, last_dir, 'combinations.csv')))
 
@@ -289,7 +275,14 @@ def run(args, human_args):
         eprint('Output folder is not empty. Try -f/--force\n', 'red')
         exit(1)
 
-    datasets = [tuple(line.strip().split(' ', 1)) for line in args.input if not line.startswith('#')]
+    input_dir = os.path.dirname(args.input.name)
+    datasets = []
+    for line in args.input:
+        if line.startswith('#'):
+            continue
+        line = line.strip().split()
+        datasets.append(tuple([line[0]] + [os.path.join(input_dir, f) for f in line[1:]]))
+
     mkdir(os.path.join(dir, 'data'))
 
     with open(os.path.join(dir, 'log.txt'), 'w') as log:
@@ -297,12 +290,11 @@ def run(args, human_args):
         
         if args.start == 'A':
             make_datasets_file(dir, log, datasets)
-            for name, path in datasets:
+            for name, _, _ in datasets:
                 mkdir(os.path.join(dir, 'data', name))
                 mkdir(os.path.join(dir, 'data', name, 'alignment'))
 
             segment_coverage(args, log, datasets)
-            j_hits(args, log, datasets)
             v_alignment(args, log, datasets)
         
         potential_mismatches(args, log, datasets)
@@ -340,11 +332,11 @@ def main():
 
     input_fmt = parser.add_argument_group('Input format')
     input_fmt.add_argument('--v-col', help='Number of a V-hit column in \n'
-                                           '<alignment_info.csv> (default: 5)',
-                           type=int, metavar='Int', default=5)
+                                           '<alignment_info.csv> (default: 3)',
+                           type=int, metavar='Int', default=3)
     input_fmt.add_argument('--j-col', help='Number of a J-hit column in \n'
-                                           '<alignment_info.csv> (default: 9)',
-                           type=int, metavar='Int', default=9)
+                                           '<alignment_info.csv> (default: 7)',
+                           type=int, metavar='Int', default=7)
     input_fmt.add_argument('--v-align-name', metavar='Str', default='v_alignments.fa',
                            help='Name of a V alignment file (default: v_alignments.fa)')
     human_args += [('Input format', None), ('V column', 'v_col'), ('J column', 'j_col'),

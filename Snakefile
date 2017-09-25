@@ -24,7 +24,7 @@ def fail():
 
 rule all:
     input:
-        expand('{outp}/data/{name}/candidate.csv', outp=OUTP, name=NAMES)
+        expand('{outp}/data/{name}/expanded.{iterations}.csv', outp=OUTP, name=NAMES, iterations=config['iterations'])
 
 
 rule create_inputs:
@@ -82,3 +82,27 @@ rule candidate:
         '%s/data/{name}/candidate.csv' % OUTP
     shell:
         '%s/candidate_polymorphisms_gap.py -i {input} -o {output} -g 0.4' % DIR
+        
+rule expand1:
+    input:
+        filtered='%s/data/{name}/filtered.csv' % OUTP,
+        candidate='%s/data/{name}/candidate.csv' % OUTP
+    output:
+        '%s/data/{name}/expanded.1.csv' % OUTP
+    shell:
+        '%s/expand_candidate.py -f {input.filtered} -c {input.candidate} -o {output}' % DIR
+
+rule expand_iter:
+    input:
+        filtered='%s/data/{name}/filtered.csv' % OUTP,
+        prev='%s/data/{name}/expanded.1.csv' % OUTP
+    output:
+        '%s/data/{name}/expanded.%d.csv' % (OUTP, config['iterations'])
+    shell:
+        'for i in $(seq 1 $(({iterations} - 1))); do\n'
+        '    {dir}/expand_candidate.py \\\n'
+        '        -f {{input.filtered}} \\\n'
+        '        -c $(dirname {{output}})/expanded.$i.csv \\\n'
+        '        -o $(dirname {{output}})/expanded.$((i + 1)).csv;\n'
+        'done'.format(dir=DIR, iterations=config['iterations'])
+

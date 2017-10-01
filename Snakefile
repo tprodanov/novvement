@@ -7,14 +7,15 @@ def load_datasets():
     with open(dataset) as f:
         datasets = [line.strip().split() for line in f if not line.startswith('#')]
         names = [item[0] for item in datasets]
-        alignment = [os.path.join(dat_dir, item[1]) for item in datasets]
-        cdrs = [os.path.join(dat_dir, item[2]) for item in datasets]
+        alignment = [os.path.abspath(os.path.join(dat_dir, item[1])) for item in datasets]
+        cdrs = [os.path.abspath(os.path.join(dat_dir, item[2])) for item in datasets]
 
     return names, alignment, cdrs
 
 NAMES, ALIGNMENTS, CDRS = load_datasets()
 DIR = '.' #os.path.dirname(__file__)
 OUTP = config['output']
+import os
 
 
 def fail():
@@ -24,33 +25,39 @@ def fail():
 
 rule all:
     input:
-        expand('{outp}/data/{name}/expanded.{iterations}.csv', outp=OUTP, name=NAMES, iterations=config['iterations'])
+        expand('{outp}/data/{name}/expanded.{iterations}.csv', outp=OUTP, name=NAMES, iterations=config['iterations']),
+        expand('{outp}/data/{name}/labels.csv', outp=OUTP, name=NAMES)
+    threads: 16
 
 
-rule create_inputs:
+def element_by_name(arr):
+    import os
+    def arr_el(wildcards):
+        return arr[NAMES.index(wildcards['name'])]
+    return arr_el
+
+
+rule create_alignment_input:
     input:
-        alignments=ALIGNMENTS,
-        cdrs=CDRS
+        element_by_name(ALIGNMENTS)
     output:
-        alignments=expand('{outp}/data/{name}/alignment.csv', outp=OUTP, name=NAMES),
-        cdrs=expand('{outp}/data/{name}/cdrs.csv', outp=OUTP, name=NAMES)
-    run:
-        import subprocess
-        import os
+        '%s/data/{name}/alignment.fa' % OUTP
+    shell:
+        'ln -s {input} {output}'
 
-        for i in range(len(NAMES)):
-            command = ['ln', '-s', os.path.abspath(input.alignments[i]), output.alignments[i]]
-            if subprocess.run(command).returncode:
-                fail()
 
-            command2 = ['ln', '-s', os.path.abspath(input.cdrs[i]), output.cdrs[i]]
-            if subprocess.run(command2).returncode:
-                fail()
-    
+rule create_cdrs_input:
+    input:
+        element_by_name(CDRS)
+    output:
+        '%s/data/{name}/cdrs.fa' % OUTP
+    shell:
+        'ln -s {input} {output}'
+
 
 rule errors:
     input:
-        '%s/data/{name}/alignment.csv' % OUTP
+        '%s/data/{name}/alignment.fa' % OUTP
     output:
         '%s/data/{name}/errors.csv' % OUTP
     shell:
@@ -59,7 +66,7 @@ rule errors:
 
 rule coverage:
     input:
-        '%s/data/{name}/alignment.csv' % OUTP
+        '%s/data/{name}/alignment.fa' % OUTP
     output:
         '%s/data/{name}/segment_coverage.csv' % OUTP
     shell:
@@ -92,17 +99,36 @@ rule expand1:
     shell:
         '%s/expand_candidate.py -f {input.filtered} -c {input.candidate} -o {output}' % DIR
 
+
+def expansion_name(wildcards):
+    return '%s/data/%s/expanded.%d.csv' % (OUTP, wildcards['name'], int(wildcards['num']) - 1)
+
+
 rule expand_iter:
     input:
         filtered='%s/data/{name}/filtered.csv' % OUTP,
-        prev='%s/data/{name}/expanded.1.csv' % OUTP
+        prev=expansion_name
     output:
-        '%s/data/{name}/expanded.%d.csv' % (OUTP, config['iterations'])
+        '%s/data/{name}/expanded.{num}.csv' % OUTP
+    wildcard_constraints:
+        num='[2-9]|[1-9]\d+'
     shell:
-        'for i in $(seq 1 $(({iterations} - 1))); do\n'
-        '    {dir}/expand_candidate.py \\\n'
-        '        -f {{input.filtered}} \\\n'
-        '        -c $(dirname {{output}})/expanded.$i.csv \\\n'
-        '        -o $(dirname {{output}})/expanded.$((i + 1)).csv;\n'
-        'done'.format(dir=DIR, iterations=config['iterations'])
+        '%s/expand_candidate.py -f {input.filtered} -c {input.prev} -o {output}' % DIR
 
+rule compile:
+    input:
+        os.path.abspath('%s/src/{name}.cpp' % DIR)
+    output:
+        os.path.abspath('%s/bin/{name}' % DIR)
+    shell:
+        'g++ {input} -std=c++1y -o {output}'
+
+
+rule labels:
+    input:
+        bin=os.path.abspath('%s/bin/hamming' % DIR),
+        f='%s/data/{name}/cdrs.fa' % OUTP
+    output:
+        '%s/data/{name}/labels.csv' % OUTP
+    shell:
+        '%s/hamming_cdrs.py -i {input.f} -o {output}' % DIR

@@ -52,7 +52,7 @@ def analyze_read(read_errors, segment_candidate, segment_combinations):
             combination.add_error(pos_alt)
 
 
-def read_errors(f, candidate):
+def analyze_all_reads(f, candidate):
     import collections
     combinations = collections.defaultdict(dict)
     
@@ -120,7 +120,7 @@ def main():
 
     args = parser.parse_args()
     candidate = load_candidate(args.candidate)
-    combinations = read_errors(args.filtered, candidate)
+    combinations = analyze_all_reads(args.filtered, candidate)
     write_candidate(candidate, combinations, args.threshold, args.ratio, args.output)
 
 

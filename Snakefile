@@ -25,8 +25,9 @@ def fail():
 
 rule all:
     input:
-        expand('{outp}/data/{name}/expanded.{iterations}.csv', outp=OUTP, name=NAMES, iterations=config['iterations']),
-        expand('{outp}/data/{name}/labels.csv', outp=OUTP, name=NAMES)
+#        expand('{outp}/data/{name}/expanded.{iterations}.csv', outp=OUTP, name=NAMES, iterations=config['iterations']),
+#        expand('{outp}/data/{name}/labels.csv', outp=OUTP, name=NAMES),
+        expand('{outp}/data/{name}/combined.csv', outp=OUTP, name=NAMES)
     threads: 16
 
 
@@ -86,32 +87,23 @@ rule candidate:
     input:
         '%s/data/{name}/filtered.csv' % OUTP
     output:
-        '%s/data/{name}/candidate.csv' % OUTP
+        '%s/data/{name}/expanded.0.csv' % OUTP
     shell:
         '%s/candidate_polymorphisms_gap.py -i {input} -o {output} -g 0.4' % DIR
         
-rule expand1:
-    input:
-        filtered='%s/data/{name}/filtered.csv' % OUTP,
-        candidate='%s/data/{name}/candidate.csv' % OUTP
-    output:
-        '%s/data/{name}/expanded.1.csv' % OUTP
-    shell:
-        '%s/expand_candidate.py -f {input.filtered} -c {input.candidate} -o {output}' % DIR
-
 
 def expansion_name(wildcards):
     return '%s/data/%s/expanded.%d.csv' % (OUTP, wildcards['name'], int(wildcards['num']) - 1)
 
 
-rule expand_iter:
+rule expand:
     input:
         filtered='%s/data/{name}/filtered.csv' % OUTP,
         prev=expansion_name
     output:
         '%s/data/{name}/expanded.{num}.csv' % OUTP
     wildcard_constraints:
-        num='[2-9]|[1-9]\d+'
+        num='[1-9]\d*'
     shell:
         '%s/expand_candidate.py -f {input.filtered} -c {input.prev} -o {output}' % DIR
 
@@ -121,14 +113,37 @@ rule compile:
     output:
         os.path.abspath('%s/bin/{name}' % DIR)
     shell:
-        'g++ {input} -std=c++1y -o {output}'
+        'g++ {input} -std=c++1y -O3 -o {output}'
 
 
-rule labels:
+rule cdr_hamming:
     input:
         bin=os.path.abspath('%s/bin/hamming' % DIR),
         f='%s/data/{name}/cdrs.fa' % OUTP
     output:
         '%s/data/{name}/labels.csv' % OUTP
     shell:
-        '%s/hamming_cdrs.py -i {input.f} -o {output}' % DIR
+        r"cat {input.f} | sed 's/^>\(.*\)$/>\1\t/' | tr -d '\n' | tr '>' '\n' | %s/hamming_labels.py -i - -o {output}" % DIR
+
+
+#rule create_datasets_file:
+#    output:
+#        '%s/data/datasets.txt' % OUTP
+#    run:
+#        with open(output[0], 'w') as outp:
+#            outp.write('name\talignment\tlabels\n')
+#            for name in NAMES:
+#                outp.write('{name}\t{name}/filtered.csv\t{name}/labels.csv\n'.format(name=name))
+
+rule combine_candidate:
+    input:
+        filtered='%s/data/{name}/filtered.csv' % OUTP,
+        candidate='%s/data/{name}/expanded.%d.csv' % (OUTP, config['iterations']),
+        labels='%s/data/{name}/labels.csv' % OUTP,
+        segments=config['segments']
+    output:
+        '%s/data/{name}/combined.csv' % OUTP
+    shell:
+        '%s/combine_errors.py -f {input.filtered} -c {input.candidate} -l {input.labels} '
+        '-s {input.segments} -o {output}' % DIR
+

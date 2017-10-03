@@ -8,8 +8,9 @@
 #include <algorithm>
 
 
-
 struct Vertex {
+
+    static bool diff_lengths_accepted;
     
     Vertex(std::string const& seq) {
         this->seq = seq;
@@ -24,12 +25,17 @@ struct Vertex {
     }
 
     size_t distance(std::string const& other) const {
+        size_t res = 0;
         if (seq.length() != other.length()) {
-            return 1000;
+            if (!Vertex::diff_lengths_accepted) {
+                return 1000;
+            } else {
+                res += std::max(seq.length(), other.length())
+                     - std::min(seq.length(), other.length());
+            }
         }
         
-        size_t res = 0;
-        for (size_t i = 0; i < seq.length(); ++i) {
+        for (size_t i = 0; i < std::min(seq.length(), other.length()); ++i) {
             if (seq[i] != other[i]) {
                 res += 1;
             }
@@ -61,6 +67,8 @@ private:
     std::vector<std::string> reads;
 
 };
+
+bool Vertex::diff_lengths_accepted = false;
 
 
 bool compare_vertices(Vertex const* first, Vertex const* second) {
@@ -144,29 +152,20 @@ private:
 };
 
 
-void create_graph(std::ifstream& inp, HammingGraph& graph) {
-    std::string line;
+void create_graph(std::istream& inp, HammingGraph& graph) {
     std::string read_name;
     std::string read_seq;
 
-    while (inp >> line) {
-        if (line[0] == '>') {
-            if (read_name.size() > 0) {
-                graph.add_read(read_name, read_seq);
-            }
-            read_name = line.substr(1);
-            read_seq = "";
-        } else {
-            read_seq += line;
-        }
-    }
-    if (read_name.size() > 0) {
+    // header
+    getline(inp, read_name);
+
+    while (inp >> read_name >> read_seq) {
         graph.add_read(read_name, read_seq);
     }
 }
 
 
-void print_labels(HammingGraph const& graph, std::ofstream& outp) {
+void print_labels(HammingGraph const& graph, std::ostream& outp) {
     outp << "read\tlabel\n";
 
     for (auto const& component : graph.components()) {
@@ -180,31 +179,18 @@ void print_labels(HammingGraph const& graph, std::ofstream& outp) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 4) {
-        std::cerr << "Should contain exactly 3 arguments: input, output, tau" << std::endl;
+    if (argc != 3) {
+        std::cerr << "argv should contain exactly 2 arguments: tau, accept_diff_len" << std::endl;
         exit(1);
     }
-
-    std::ifstream inp(argv[1]);
-
-    if (!inp) {
-        std::cerr << "Cannot open file " << argv[1] << std::endl;
-        exit(1);
-    }
-
-    std::ofstream outp(argv[2]);
-
-    outp << '#';
-    for (size_t i = 0; i < argc; ++i) {
-        outp << ' ' << argv[i];
-    }
-    outp << '\n';
-
+    
     size_t tau;
-    sscanf(argv[3], "%zu", &tau);
+    sscanf(argv[1], "%zu", &tau);
+
+    Vertex::diff_lengths_accepted = std::string(argv[2]) == "True";
 
     HammingGraph graph(tau);
-    create_graph(inp, graph);
-    print_labels(graph, outp);
+    create_graph(std::cin, graph);
+    print_labels(graph, std::cout);
 }
 

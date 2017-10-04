@@ -27,7 +27,7 @@ rule all:
     input:
 #        expand('{outp}/data/{name}/expanded.{iterations}.csv', outp=OUTP, name=NAMES, iterations=config['iterations']),
 #        expand('{outp}/data/{name}/labels.csv', outp=OUTP, name=NAMES),
-        expand('{outp}/data/{name}/combined.csv', outp=OUTP, name=NAMES)
+        expand('{outp}/data/components.csv', outp=OUTP)
     threads: 16
 
 
@@ -123,7 +123,8 @@ rule cdr_hamming:
     output:
         '%s/data/{name}/labels.csv' % OUTP
     shell:
-        r"cat {input.f} | sed 's/^>\(.*\)$/>\1\t/' | tr -d '\n' | tr '>' '\n' | %s/hamming_labels.py -i - -o {output}" % DIR
+        r"cat {input.f} | sed 's/^>\(.*\)$/>\1\t/' | tr -d '\n' | tr '>' '\n' | %s/hamming_labels.py -i - -o {output};" % DIR \
+        + '\n' + r"sed -i '3~1s/\t/\t{wildcards.name}_/' {output}"
 
 
 #rule create_datasets_file:
@@ -146,4 +147,34 @@ rule combine_candidate:
     shell:
         '%s/combine_errors.py -f {input.filtered} -c {input.candidate} -l {input.labels} '
         '-s {input.segments} -o {output}' % DIR
+
+
+rule clip_and_filter:
+    input:
+        bin=os.path.abspath('%s/bin/clip_and_filter' % DIR),
+        combined='%s/data/{name}/combined.csv' % OUTP,
+        segments=config['segments']
+    output:
+        '%s/data/{name}/clipped_filtered.csv' % OUTP
+    shell:
+        'tail -n+3 {input.combined} | cut -f4 | %s/clip_and_filter.py -s - -S {input.segments} -o {output}' % DIR
+
+rule concat_sequences:
+    input:
+        expand('{outp}/data/{name}/clipped_filtered.csv', outp=OUTP, name=NAMES)
+    output:
+        '%s/data/concat.csv' % OUTP
+    shell:
+        'echo "seq\tlabel" > {output}\n' \
+        'for f in {input}; do tail -n+3 $f >> {output}; done'
+
+
+rule hamming_sequences:
+    input:
+        bin=os.path.abspath('%s/bin/hamming' % DIR),
+        f='%s/data/concat.csv' % OUTP
+    output:
+        '%s/data/components.csv' % OUTP
+    shell:
+        r"%s/hamming_labels.py -i {input.f} -o {output};" % DIR
 

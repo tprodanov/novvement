@@ -10,7 +10,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='Clip sequences and filter by distance to target',
                                      formatter_class=argparse.RawTextHelpFormatter, add_help=False,
-                                     usage='%(prog)s -i File -o File [-t Int] [-d]')
+                                     usage='%(prog)s -s File -S File -o File [args]')
     io_args = parser.add_argument_group('Input/output arguments')
     io_args.add_argument('-s', '--sequences', help='Input file, every line - single sequence',
                          type=argparse.FileType(), required=True, metavar='File')

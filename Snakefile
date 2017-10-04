@@ -27,7 +27,7 @@ rule all:
     input:
 #        expand('{outp}/data/{name}/expanded.{iterations}.csv', outp=OUTP, name=NAMES, iterations=config['iterations']),
 #        expand('{outp}/data/{name}/labels.csv', outp=OUTP, name=NAMES),
-        expand('{outp}/data/components.csv', outp=OUTP)
+        expand('{outp}/data/merged.csv', outp=OUTP)
     threads: 16
 
 
@@ -178,3 +178,13 @@ rule hamming_sequences:
     shell:
         r"%s/hamming_labels.py -i {input.f} -o {output};" % DIR
 
+
+rule merge_and_sort:
+    input:
+        combined=expand('{outp}/data/{name}/combined.csv', outp=OUTP, name=NAMES),
+        components='%s/data/components.csv' % OUTP
+    output:
+        '%s/data/merged.csv' % OUTP,
+        '%s/data/merged_full.csv' % OUTP
+    shell:
+        '%s/merge_and_sort.py -i {input.combined} -c {input.components} -o {output}' % DIR

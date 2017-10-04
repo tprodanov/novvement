@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <algorithm>
 
 size_t hamming_distance(std::string const& seq1, std::string const& seq2) {
     size_t res = std::max(seq1.length(), seq2.length()) - std::min(seq1.length(), seq2.length());
@@ -33,7 +34,9 @@ std::vector<std::string> load_segments(std::istream& inp, size_t start, size_t l
         getline(inp, current);
         if (current[0] == '>') {
             if (!seq.empty() && seq.length() > start) {
-                res.push_back(seq.substr(start, length));
+                seq = seq.substr(start, length);
+                std::transform(seq.begin(), seq.end(), seq.begin(), ::toupper);
+                res.push_back(seq);
             }
             seq = "";
         } else {
@@ -42,7 +45,9 @@ std::vector<std::string> load_segments(std::istream& inp, size_t start, size_t l
     }
 
     if (!seq.empty() && seq.length() > start) {
-        res.push_back(seq.substr(start, length));
+        seq = seq.substr(start, length);
+        std::transform(seq.begin(), seq.end(), seq.begin(), ::toupper);
+        res.push_back(seq);
     }
     return res;
 }

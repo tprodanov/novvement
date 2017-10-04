@@ -91,6 +91,9 @@ def merge_combinations(f, components, merged):
 
 
 def print_merged(merged, outp, short, min_coverage):
+    import sys
+    outp.write('# %s\n' % ' '.join(sys.argv))
+    
     if not short:
         outp.write('super\t')
     outp.write('significance\tcombinations\tseq\tlabels\n')

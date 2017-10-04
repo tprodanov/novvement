@@ -1,7 +1,7 @@
 def load_datasets():
     import os
 
-    dataset = config['datasets']
+    dataset = config['input']
     dat_dir = os.path.dirname(dataset)
 
     with open(dataset) as f:
@@ -13,26 +13,18 @@ def load_datasets():
     return names, alignment, cdrs
 
 NAMES, ALIGNMENTS, CDRS = load_datasets()
-DIR = '.' #os.path.dirname(__file__)
+DIR = config['script_dir']
 OUTP = config['output']
 import os
 
 
-def fail():
-    print('Error')
-    exit(1)
-
-
 rule all:
     input:
-#        expand('{outp}/data/{name}/expanded.{iterations}.csv', outp=OUTP, name=NAMES, iterations=config['iterations']),
-#        expand('{outp}/data/{name}/labels.csv', outp=OUTP, name=NAMES),
         expand('{outp}/data/merged.csv', outp=OUTP)
-    threads: 16
+    threads: config['threads']
 
 
 def element_by_name(arr):
-    import os
     def arr_el(wildcards):
         return arr[NAMES.index(wildcards['name'])]
     return arr_el
@@ -56,47 +48,71 @@ rule create_cdrs_input:
         'ln -s {input} {output}'
 
 
-rule errors:
+rule alignment_errors:
     input:
         '%s/data/{name}/alignment.fa' % OUTP
     output:
         '%s/data/{name}/errors.csv' % OUTP
+    message:
+        'Alignment fasta to csv: {wildcards.name}'
     shell:
         '%s/alignment_errors.py -i {input} -o {output}' % DIR
 
 
-rule coverage:
+rule segment_coverage:
     input:
         '%s/data/{name}/alignment.fa' % OUTP
     output:
         '%s/data/{name}/segment_coverage.csv' % OUTP
+    message:
+        'Calculating segment coverage: {wildcards.name}'
     shell:
         r"cat {input} | sed -n '3~4p' | sed 's/.*GENE:\([^|]*\)|.*/\1/' | sort | uniq -c "
         r"| awk '{{t = $1; $1 = $2; $2 = t; print}}' > {output}"
 
-rule filter:
+
+rule filter_errors:
     input:
         errors='%s/data/{name}/errors.csv' % OUTP,
         coverage='%s/data/{name}/segment_coverage.csv' % OUTP
     output:
         '%s/data/{name}/filtered.csv' % OUTP
+    message:
+        'Filtering errors: {wildcards.name}'
     shell:
-        '%s/filter_errors.py -e {input.errors} -c {input.coverage} -o {output}' % DIR
+        '{dir}/filter_errors.py -e {{input.errors}} -c {{input.coverage}} -o {{output}} ' \
+        '--range {range[0]} {range[1]} --threshold {threshold}'.format(dir=DIR,
+                                                                       range=config['range'],
+                                                                       threshold=config['segment_coverage'])
 
-rule candidate:
+
+det_method = config['det_method']
+if det_method == 'gap':
+    det_args = '--gap {gap}'.format(gap=config['gap_size'])
+elif det_method == 'quantile':
+    det_args = '--multiplier {multiplier} --quantile {quantile}'.format(multiplier=config['multiplier'],
+                                                                        quantile=config['quantile'])
+
+
+rule candidate_polymorphisms:
     input:
         '%s/data/{name}/filtered.csv' % OUTP
     output:
         '%s/data/{name}/expanded.0.csv' % OUTP
+    message:
+        'Detecting candidate polymorphisms: {wildcards.name}'
     shell:
-        '%s/candidate_polymorphisms_gap.py -i {input} -o {output} -g 0.4' % DIR
-        
+        '{dir}/candidate_polymorphisms_{method}.py -i {{input}} -o {{output}} {args}' \
+            .format(dir=DIR,
+                    method=det_method,
+                    args=det_args)
+
 
 def expansion_name(wildcards):
     return '%s/data/%s/expanded.%d.csv' % (OUTP, wildcards['name'], int(wildcards['num']) - 1)
 
 
-rule expand:
+rule expand_candidate:
     input:
         filtered='%s/data/{name}/filtered.csv' % OUTP,
         prev=expansion_name
@@ -104,39 +120,41 @@ rule expand:
         '%s/data/{name}/expanded.{num}.csv' % OUTP
     wildcard_constraints:
         num='[1-9]\d*'
+    message:
+        'Expanding candidate polymorphisms: {wildcards.name}'
     shell:
-        '%s/expand_candidate.py -f {input.filtered} -c {input.prev} -o {output}' % DIR
+        '{dir}/expand_candidate.py -f {{input.filtered}} -c {{input.prev}} -o {{output}} ' \
+        '--threshold {threshold} --ratio {ratio}'.format(dir=DIR,
+                                                         threshold=config['expansion_coverage'],
+                                                         ratio=config['expansion_ratio'])
+
 
 rule compile:
     input:
         os.path.abspath('%s/src/{name}.cpp' % DIR)
     output:
         os.path.abspath('%s/bin/{name}' % DIR)
+    message:
+        'Compiling {wildcards.name}.cpp'
     shell:
         'g++ {input} -std=c++1y -O3 -o {output}'
 
 
-rule cdr_hamming:
+rule hamming_labels:
     input:
         bin=os.path.abspath('%s/bin/hamming' % DIR),
         f='%s/data/{name}/cdrs.fa' % OUTP
     output:
         '%s/data/{name}/labels.csv' % OUTP
+    message:
+        'Merging read labels using Hamming graph: {wildcards.name}'
     shell:
-        r"cat {input.f} | sed 's/^>\(.*\)$/>\1\t/' | tr -d '\n' | tr '>' '\n' | %s/hamming_labels.py -i - -o {output};" % DIR \
-        + '\n' + r"sed -i '3~1s/\t/\t{wildcards.name}_/' {output}"
+        r"cat {{input.f}} | sed 's/^>\(.*\)$/>\1\t/' | tr -d '\n' | tr '>' '\n' | " \
+        '{dir}/hamming_labels.py -i - -o {{output}} --tau {tau};\n' \
+        r"sed -i '3~1s/\t/\t{{wildcards.name}}_/' {{output}}".format(dir=DIR, tau=config['labels_tau'])
+    
 
-
-#rule create_datasets_file:
-#    output:
-#        '%s/data/datasets.txt' % OUTP
-#    run:
-#        with open(output[0], 'w') as outp:
-#            outp.write('name\talignment\tlabels\n')
-#            for name in NAMES:
-#                outp.write('{name}\t{name}/filtered.csv\t{name}/labels.csv\n'.format(name=name))
-
-rule combine_candidate:
+rule combine_errors:
     input:
         filtered='%s/data/{name}/filtered.csv' % OUTP,
         candidate='%s/data/{name}/expanded.%d.csv' % (OUTP, config['iterations']),
@@ -144,6 +162,8 @@ rule combine_candidate:
         segments=config['segments']
     output:
         '%s/data/{name}/combined.csv' % OUTP
+    message:
+        'Combine errors: {wildcards.name}'
     shell:
         '%s/combine_errors.py -f {input.filtered} -c {input.candidate} -l {input.labels} '
         '-s {input.segments} -o {output}' % DIR
@@ -156,8 +176,15 @@ rule clip_and_filter:
         segments=config['segments']
     output:
         '%s/data/{name}/clipped_filtered.csv' % OUTP
+    message:
+        'Clip and filter sequences: {wildcards.name}'
     shell:
-        'tail -n+3 {input.combined} | cut -f4 | %s/clip_and_filter.py -s - -S {input.segments} -o {output}' % DIR
+        'tail -n+3 {{input.combined}} | cut -f4 | ' \
+        '{dir}/clip_and_filter.py -s - -S {{input.segments}} -o {{output}} ' \
+        '--range {range[0]} {range[1]} --min-dist {min_dist}'.format(dir=DIR,
+                                                                     range=config['range'],
+                                                                     min_dist=config['min_dist'])
+
 
 rule concat_sequences:
     input:
@@ -175,8 +202,12 @@ rule hamming_sequences:
         f='%s/data/concat.csv' % OUTP
     output:
         '%s/data/components.csv' % OUTP
+    message:
+        'Merging sequences using Hamming graph'
     shell:
-        r"%s/hamming_labels.py -i {input.f} -o {output};" % DIR
+        '{dir}/hamming_labels.py -i {{input.f}} -o {{output}} --tau {tau}{diff_lengths}' \
+            .format(dir=DIR, tau=config['seqs_tau'],
+                    diff_lengths='' if config['seqs_same_lengths'] else ' --accept-diff-lengths')
 
 
 rule merge_and_sort:
@@ -186,5 +217,9 @@ rule merge_and_sort:
     output:
         '%s/data/merged.csv' % OUTP,
         '%s/data/merged_full.csv' % OUTP
+    message:
+        'Merging novel sequences and sorting them'
     shell:
-        '%s/merge_and_sort.py -i {input.combined} -c {input.components} -o {output}' % DIR
+        '{dir}/merge_and_sort.py -i {{input.combined}} -c {{input.components}} -o {{output}} --min-coverage {min_coverage}' \
+            .format(dir=DIR, min_coverage=config['label_coverage'])
+

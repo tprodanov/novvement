@@ -112,7 +112,7 @@ def main():
                           type=int, metavar='Int', default=50)
     exp_args.add_argument('-r', '--ratio', type=float, metavar='Float', default=0.75,
                           help='Candidate polymorphisms coverage ratio to combination coverage\n'
-                          '(default: %(default)s')
+                          '(default: %(default)s)')
                 
     other = parser.add_argument_group('Other arguments')
     other.add_argument('-h', '--help', action='help', help='Show this message and exit')

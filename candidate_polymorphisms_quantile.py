@@ -52,7 +52,7 @@ def main():
     detection_args = parser.add_argument_group('Detection arguments')
     detection_args.add_argument('-m', '--multiplier', metavar='Float', type=float, default=4,
                                 help='Quantile multiplier:\n'
-                                'we select positions with number of errors at least\n'
+                                'We select positions with number of errors at least\n'
                                 '<--multiplier> * <-q quantile of errors per position>\n'
                                 '(default: %(default)s)')
     detection_args.add_argument('-q', '--quantile', metavar='Float', type=float, default=95,

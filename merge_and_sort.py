@@ -24,7 +24,7 @@ class NovelSequence:
         self.labels = collections.Counter()
 
     def add_entry(self, segment, combination, labels):
-        self.segm_comb.add('%s(%s)' % (segment, combination))
+        self.segm_comb.add('%s|%d|%s' % (segment, combination.count(':'), combination))
         self.labels.update(labels)
 
     def to_string(self, min_coverage):
@@ -32,7 +32,7 @@ class NovelSequence:
                     .format(significance=significance(self.labels, min_coverage),
                             combination=','.join(self.segm_comb),
                             seq=self.seq,
-                            labels=','.join('%s:%d' % entry for entry in self.labels.items()))
+                            labels=','.join('%s:%d' % entry for entry in self.labels.most_common()))
 
 
 class MergedSequence:
@@ -69,7 +69,7 @@ class MergedSequence:
                     .format(significance=significance(self.labels, min_coverage),
                             combination=','.join(sorted_sequences[0].segm_comb),
                             seq=sorted_sequences[0].seq,
-                            labels=','.join('%s:%d' % entry for entry in self.labels.items()))
+                            labels=','.join('%s:%d' % entry for entry in self.labels.most_common()))
 
 
 def load_components(f):

@@ -9,7 +9,7 @@ def load_segment_coverage(f):
     return coverages
 
 
-def filter_errors(inp, outp, pos_range, coverages, cov_threshold):
+def filter_errors(inp, outp, pos_range, coverages, cov_threshold, keep_n):
     import sys
 
     l, r = pos_range
@@ -23,8 +23,11 @@ def filter_errors(inp, outp, pos_range, coverages, cov_threshold):
     for line in inp:
         read, segment, position, alt = line.strip().split('\t')
         position = int(position)
+        if not keep_n and alt == 'N':
+            continue
         if l <= position <= r and coverages[segment] >= cov_threshold:
             outp.write(line)
+
 
 def main():
     import argparse
@@ -47,6 +50,8 @@ def main():
                              default=[40, 290])
     filter_args.add_argument('-t', '--threshold', metavar='Int', type=int, default=100,
                              help='Minimal segment coverage (default: %(default)s)')
+    filter_args.add_argument('--keep-n', action='store_true',
+                             help='Do not filter out mismatches with N as a substitute')
     
     other = parser.add_argument_group('Other arguments')
     other.add_argument('-h', '--help', action='help', help='Show this message and exit')
@@ -54,7 +59,8 @@ def main():
 
     args = parser.parse_args()
     coverages = load_segment_coverage(args.coverage)
-    filter_errors(args.errors, args.output, pos_range=args.range, coverages=coverages, cov_threshold=args.threshold)
+    filter_errors(args.errors, args.output,
+                  pos_range=args.range, coverages=coverages, cov_threshold=args.threshold, keep_n=args.keep_n)
 
 
 if __name__ == '__main__':

@@ -26,6 +26,8 @@ def create_parser():
     filt_args.add_argument('--segm-cov', '--segment-coverage', dest='segment_coverage',
                            type=int, metavar='Int', default=100,
                            help='Minimal segment coverage (default: %(default)s)')
+    filt_args.add_argument('--keep-n', action='store_true',
+                           help='Do not filter out mismatches with nN as a substitute')
 
     det_args = parser.add_argument_group('Candidate polymorphisms detection')
     det_args.add_argument('--det-method', help='Candidate detection method (default: %(default)s)',

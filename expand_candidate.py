@@ -34,6 +34,26 @@ class Combination:
                 return
             yield pos_alt
 
+    def write_long(self, segment, ratio, outp):
+        combination_str = ','.join('%s:%s' % item for item in sorted(self.combination))
+        if not combination_str:
+            combination_str = '*'
+
+        for pos, alt in sorted(self.combination):
+            current = '{segment}\t{pos}\t{alt}\t{candidate}\t{combination}\n' \
+                            .format(segment=segment, pos=pos, alt=alt,
+                                    candidate='old', combination=combination_str)
+            for i in range(self.coverage):
+                outp.write(current)
+
+        for (pos, alt), count in self.expansion.most_common():
+            current = '{segment}\t{pos}\t{alt}\t{candidate}\t{combination}\n' \
+                            .format(segment=segment, pos=pos, alt=alt,
+                                    candidate='new' if count >= self.coverage * ratio else 'none',
+                                    combination=combination_str)
+            for i in range(count):
+                outp.write(current)
+
 
 def analyze_read(read_errors, segment_candidate, segment_combinations):
     current_candidate = []
@@ -92,6 +112,18 @@ def write_candidate(candidate, combinations, coverage, ratio, outp):
             outp.write('%s\t%d\t%s\n' % (segment, pos, alt))
 
 
+def write_long(combinations, coverage, ratio, outp):
+    import sys
+
+    outp.write('# %s\n' % ' '.join(sys.argv))
+    outp.write('segment\tpos\talt\tcandidate\tcombination\n')
+
+    for segment, segment_combinations in combinations.items():
+        for combination in segment_combinations.values():
+            if combination.coverage >= coverage:
+                combination.write_long(segment, ratio, outp)
+
+
 def main():
     import argparse
     from extra._version import __version__
@@ -106,6 +138,8 @@ def main():
                          type=argparse.FileType(), required=True, metavar='File')
     io_args.add_argument('-o', '--output', help='Output csv file',
                          type=argparse.FileType('w'), required=True, metavar='File')
+    io_args.add_argument('--long', action='store_true',
+                         help='Write output in a long format')
 
     exp_args = parser.add_argument_group('Expansion arguments')
     exp_args.add_argument('-t', '--threshold', help='Combination coverage threshold (default: %(default)s)',
@@ -113,7 +147,7 @@ def main():
     exp_args.add_argument('-r', '--ratio', type=float, metavar='Float', default=0.75,
                           help='Candidate polymorphisms coverage ratio to combination coverage\n'
                           '(default: %(default)s)')
-                
+
     other = parser.add_argument_group('Other arguments')
     other.add_argument('-h', '--help', action='help', help='Show this message and exit')
     other.add_argument('-V', '--version', action='version', help='Show version', version=__version__)
@@ -121,7 +155,11 @@ def main():
     args = parser.parse_args()
     candidate = load_candidate(args.candidate)
     combinations = analyze_all_reads(args.filtered, candidate)
-    write_candidate(candidate, combinations, args.threshold, args.ratio, args.output)
+
+    if args.long:
+        write_long(combinations, args.threshold, args.ratio, args.output)
+    else:
+        write_candidate(candidate, combinations, args.threshold, args.ratio, args.output)
 
 
 if __name__ == '__main__':

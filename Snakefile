@@ -81,9 +81,10 @@ rule filter_errors:
         'Filtering errors: {wildcards.name}'
     shell:
         '{dir}/filter_errors.py -e {{input.errors}} -c {{input.coverage}} -o {{output}} ' \
-        '--range {range[0]} {range[1]} --threshold {threshold}'.format(dir=DIR,
+        '--range {range[0]} {range[1]} --threshold {threshold}{keep_n}'.format(dir=DIR,
                                                                        range=config['range'],
-                                                                       threshold=config['segment_coverage'])
+                                                                       threshold=config['segment_coverage'],
+                                                                       keep_n=' --keep-n' if config['keep_n'] else '')
 
 
 det_method = config['det_method']

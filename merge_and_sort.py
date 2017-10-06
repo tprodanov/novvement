@@ -30,7 +30,7 @@ class NovelSequence:
     def to_string(self, min_coverage):
         return '{significance}\t{combination}\t{seq}\t{labels}' \
                     .format(significance=significance(self.labels, min_coverage),
-                            combination=','.join(self.segm_comb),
+                            combination=';'.join(self.segm_comb),
                             seq=self.seq,
                             labels=','.join('%s:%d' % entry for entry in self.labels.most_common()))
 
@@ -67,7 +67,7 @@ class MergedSequence:
         sorted_sequences = self.sorted(min_coverage)
         return '{significance}\t{combination}\t{seq}\t{labels}' \
                     .format(significance=significance(self.labels, min_coverage),
-                            combination=','.join(sorted_sequences[0].segm_comb),
+                            combination=';'.join(sorted_sequences[0].segm_comb),
                             seq=sorted_sequences[0].seq,
                             labels=','.join('%s:%d' % entry for entry in self.labels.most_common()))
 

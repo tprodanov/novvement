@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
 
+import collections
+
+
 def load_candidate(f):
-    import collections
     candidate = collections.defaultdict(set)
 
     while next(f).startswith('#'):
@@ -15,80 +17,93 @@ def load_candidate(f):
     return candidate
 
 
-class Combination:
-    def __init__(self, segment, combination, seq):
-        import collections
+class ReadsSubset:
+    def __init__(self, segment, candidate, reads, coverage=None):
         self.segment = segment
-        self.combination = combination
-        self.seq = seq
-        self.labels = collections.Counter()
-
-    def add_label(self, label):
-        self.labels[label] += 1
-
-    def __str__(self):
-        return '{segment}\t{combination}\t{labels}\t{seq}' \
-                    .format(segment=self.segment,
-                            combination=','.join('%d:%s' % item for item in self.combination)
-                                        if self.combination else '*',
-                            labels=','.join('%s:%d' % item for item in self.labels.most_common()),
-                            seq=self.seq)
-                           
-
-class Segment:
-    def __init__(self, name, seq, candidate):
-        import collections
-        self.name = name
-        self.seq = seq
-        self.combinations = {}
         self.candidate = candidate
+        self.reads = reads
+        if coverage is not None:
+            self.coverage = coverage
+        else:
+            self.coverage = len(self.reads)
 
-    def __create_seq(self, combination):
-        new_seq = list(self.seq)
-        shift = -1
-        for pos, alt in combination:
-            if alt.startswith('i'):
-                insert = list(alt[1:])
-                new_seq = new_seq[ : pos + shift] + insert + new_seq[pos + shift : ]
-                shift += len(insert)
+        self.categorized = collections.defaultdict(list)
+        self.__categorize_errors()
 
-            elif alt.startswith('d'):
-                deletion_len = int(alt[1:])
-                new_seq = new_seq[ : pos + shift] + new_seq[pos + shift + deletion_len : ]
-                shift -= deletion_len
+    def __read_candidate_errors(self, errors):
+        return tuple(sorted(error for error in errors if error in self.candidate))
 
-            else:
-                new_seq[pos + shift] = alt
+    def __categorize_errors(self):
+        self.categorized.clear()
+        for name, errors in self.reads:
+            read_category = self.__read_candidate_errors(errors)
+            if read_category:
+                self.categorized[read_category].append((name, errors))
 
-        return ''.join(new_seq)
+    def __best_category(self):
+        m = 0
+        best = None
+        for category, reads in self.categorized.items():
+            if len(reads) > m and category:
+                m = len(reads)
+                best = category
+        return best
 
-    def get_combination(self, read_errors):
-        combination = tuple(sorted(alt for alt in read_errors if alt in self.candidate))
-        
-        if combination in self.combinations:
-            return self.combinations[combination]
+    def __reduce_reads(self, category_reads):
+        from operator import itemgetter
+        names = set(map(itemgetter(0), category_reads))
+        return [read for read in self.reads if read[0] not in names]
 
-        self.combinations[combination] = Combination(self.name,
-                                                     combination,
-                                                     self.__create_seq(combination))
-        return self.combinations[combination]
+    def split_if_needed(self, coverage):
+        category = self.__best_category()
+        category_reads = self.categorized[category]
 
-    def get_combinations(self):
-        return self.combinations.values()
+        if len(category_reads) < coverage:
+            return None
 
-def load_segments(segments_fa, candidate):
-    segment_seqs = {}
-    for entry in segments_fa:
-        segment_seqs[entry.name[1:]] = entry.seq
+        self.reads = self.__reduce_reads(category_reads)
+        self.candidate -= set(category)
+        self.coverage -= len(category_reads)
+        self.__categorize_errors()
 
-    segments = {}
-    for segment, segment_candidate in candidate.items():
-        segments[segment] = Segment(segment, segment_seqs[segment], segment_candidate)
-    return segments
+        return ReadsSubset(self.segment, self.candidate, category_reads)
+
+    def consensus(self, min_ratio=0.51):
+        frequences = collections.Counter()
+        for _, read_errors in self.reads:
+            for error in read_errors:
+                frequences[error] += 1
+
+        result = []
+        for error, count in frequences.items():
+            if count >= min_ratio * self.coverage:
+                result.append(error)
+        return sorted(result)
 
 
-def analyze_all_reads(f, segments, labels):
-    import collections
+def create_seq(seq, combination):
+    new_seq = list(seq)
+    shift = -1
+    for pos, alt in combination:
+        if alt.startswith('i'):
+            insert = list(alt[1:])
+            new_seq = new_seq[ : pos + shift] + insert + new_seq[pos + shift : ]
+            shift += len(insert)
+        elif alt.startswith('d'):
+            deletion_len = int(alt[1:])
+            new_seq = new_seq[ : pos + shift] + new_seq[pos + shift + deletion_len : ]
+            shift -= deletion_len
+        else:
+            new_seq[pos + shift] = alt
+    return ''.join(new_seq)
+
+
+def load_segments(segments_fa):
+    return {entry.name[1:]: entry.seq for entry in segments_fa}
+
+
+def load_reads(f, labels):
+    reads = collections.defaultdict(list)
     
     last_read = None
     last_segment = None
@@ -100,17 +115,17 @@ def analyze_all_reads(f, segments, labels):
         read, segment, position, alt = line.strip().split('\t')
         position = int(position)
         if read != last_read:
-            if last_segment in segments and last_read in labels:
-                segments[last_segment].get_combination(read_errors).add_label(labels[last_read])
+            if last_read in labels:
+                reads[last_segment].append((last_read, read_errors))
             last_read = read
             last_segment = segment
             read_errors = []
 
         read_errors.append((position, alt))
 
-    if last_segment in segments and last_read in labels:
-        segments[last_segment].get_combination(read_errors).add_label(labels[last_read])
-
+    if last_read in labels:
+        reads[last_segment].append((last_read, read_errors))
+    return reads
 
 def load_labels(f):
     while next(f).startswith('#'):
@@ -118,19 +133,64 @@ def load_labels(f):
     return dict(line.strip().split() for line in f)
 
 
-def write_combinations(segments, outp):
+def initialize_reads_subsets(reads, segments, candidate):
+    reads_subsets = {}
+    for segment in segments:
+        if segment not in reads:
+            continue
+        reads_subsets[segment] = ReadsSubset(segment,
+                                             candidate.get(segment, set()),
+                                             reads[segment])
+    return reads_subsets
+
+
+def traverse_reads_subsets(reads_subsets, coverage):
+    stack = list(reads_subsets.values())
+    result = []
+
+    while stack:
+        current = stack.pop()
+        if current.coverage < coverage:
+            result.append(current)
+            continue
+        
+        novel = current.split_if_needed(coverage)
+        if novel:
+            stack.append(current)
+            stack.append(novel)
+        else:
+            result.append(current)
+
+    return result
+
+
+def reads_labels(reads, labels):
+    reads_labels = collections.Counter()
+    for name, _ in reads:
+        reads_labels[labels[name]] += 1
+    return ','.join('%s:%d' % item for item in reads_labels.most_common())
+
+
+def write_subsets(reads_subsets, labels, segments, outp, coverage, consensus_ratio):
     import sys
     outp.write('# %s\n' % ' '.join(sys.argv))
     outp.write('segment\tcombination\tlabels\tseq\n')
-    for segment in segments.values():
-        for combination in segment.get_combinations():
-            outp.write(str(combination))
-            outp.write('\n')
+    for subset in reads_subsets:
+        if subset.coverage < coverage:
+            continue
+
+        consensus = subset.consensus(consensus_ratio)
+        seq = create_seq(segments[subset.segment], consensus)
+
+        outp.write('{segment}\t{combination}\t{labels}\t{seq}\n'
+                .format(segment=subset.segment,
+                        combination=','.join('%d:%s' % item for item in consensus) if consensus else '*',
+                        labels=reads_labels(subset.reads, labels),
+                        seq=seq))
 
 
 def main():
     import argparse
-    import os
     from extra._version import __version__
     from extra import nt_string
 
@@ -149,6 +209,13 @@ def main():
     io_args.add_argument('-o', '--output', help='Output csv file',
                          type=argparse.FileType('w'), required=True, metavar='File')
 
+    sc_args = parser.add_argument_group('Split and consensus arguments')
+    sc_args.add_argument('--coverage', type=int, metavar='Int', default=100,
+                         help='Minimal coverage of a reads subset (default: %(default)s')
+    sc_args.add_argument('--cons-ratio', type=float, metavar='Float', default=0.51,
+                         help='Ratio for a new polymorphisms to be chosen.\n'
+                         'Should be higher than 0.5 (default: %(default)s)')
+
     other = parser.add_argument_group('Other arguments')
     other.add_argument('-h', '--help', action='help', help='Show this message and exit')
     other.add_argument('-V', '--version', action='version', help='Show version', version=__version__)
@@ -156,11 +223,14 @@ def main():
     args = parser.parse_args()
 
     candidate = load_candidate(args.candidate)
-    segments = load_segments(nt_string.read_fasta(args.segments), candidate)
+    segments = load_segments(nt_string.read_fasta(args.segments))
     labels = load_labels(args.labels)
-    analyze_all_reads(args.filtered, segments, labels)
-    
-    write_combinations(segments, args.output)
+    reads = load_reads(args.filtered, labels)
+
+    reads_subsets = initialize_reads_subsets(reads, segments, candidate)
+    reads_subsets = traverse_reads_subsets(reads_subsets, args.coverage)
+    write_subsets(reads_subsets, labels, segments, args.output,
+                  args.coverage, args.cons_ratio)
 
 
 if __name__ == '__main__':

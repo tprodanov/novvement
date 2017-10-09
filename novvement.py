@@ -42,18 +42,16 @@ def create_parser():
     det_args.add_argument('--quantile', metavar='Float', type=float, default=95,
                           help='Quantile used for comparison (if --det-method quantile)\n'
                           '(default: %(default)s)')
-
-    exp_args = parser.add_argument_group('Expanding candidate polymorphisms set')
-    exp_args.add_argument('--iterations', metavar='Int', type=int, default=3,
-                          help='Expansion iterations (default: %(default)s)')
-    exp_args.add_argument('--exp-cov', '--expansion-coverage', dest='expansion_coverage',
-                          metavar='Int', type=int, default=50,
-                          help='Combination coverage threshold (default: %(default)s)')
-    exp_args.add_argument('--exp-ratio', '--expansion-ratio', dest='expansion_ratio',
-                          metavar='Float', type=float, default=0.75,
-                          help='Candidate polymorphisms coverage ratio to combination coverage\n'
-                          '(default: %(default)s)')
-
+    
+    sc_args = parser.add_argument_group('Spliting reads and finding a consensus')
+    sc_args.add_argument('--spl-cov', '--split-coverage', dest='split_coverage',
+                         type=int, metavar='INT', default=100,
+                         help='Minimal coverage of a reads subset (default: %(default)s)')
+    sc_args.add_argument('--cons-ratio', '--consensus-ratio', dest='consensus_ratio',
+                         type=float, metavar='FLOAT', default=0.51,
+                         help='Ratio for a new polymorphisms to be chosen.\n'
+                              'Should be higher than 0.5 (default: %(default)s)')
+            
     hl_args = parser.add_argument_group('Merging labels using Hamming graph')
     hl_args.add_argument('--labels-tau', metavar='Int', type=int, default=3,
                          help='Hamming distance between labels (cdr3s) (default: %(default)s)')

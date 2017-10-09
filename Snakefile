@@ -99,7 +99,7 @@ rule candidate_polymorphisms:
     input:
         '%s/data/{name}/filtered.csv' % OUTP
     output:
-        '%s/data/{name}/expanded.0.csv' % OUTP
+        '%s/data/{name}/candidate.csv' % OUTP
     message:
         'Detecting candidate polymorphisms: {wildcards.name}'
     shell:
@@ -111,23 +111,6 @@ rule candidate_polymorphisms:
 
 def expansion_name(wildcards):
     return '%s/data/%s/expanded.%d.csv' % (OUTP, wildcards['name'], int(wildcards['num']) - 1)
-
-
-rule expand_candidate:
-    input:
-        filtered='%s/data/{name}/filtered.csv' % OUTP,
-        prev=expansion_name
-    output:
-        '%s/data/{name}/expanded.{num}.csv' % OUTP
-    wildcard_constraints:
-        num='[1-9]\d*'
-    message:
-        'Expanding candidate polymorphisms: {wildcards.name}'
-    shell:
-        '{dir}/expand_candidate.py -f {{input.filtered}} -c {{input.prev}} -o {{output}} ' \
-        '--threshold {threshold} --ratio {ratio}'.format(dir=DIR,
-                                                         threshold=config['expansion_coverage'],
-                                                         ratio=config['expansion_ratio'])
 
 
 rule compile:
@@ -158,7 +141,7 @@ rule hamming_labels:
 rule combine_errors:
     input:
         filtered='%s/data/{name}/filtered.csv' % OUTP,
-        candidate='%s/data/{name}/expanded.%d.csv' % (OUTP, config['iterations']),
+        candidate='%s/data/{name}/candidate.csv' % OUTP,
         labels='%s/data/{name}/labels.csv' % OUTP,
         segments=config['segments']
     output:
@@ -166,8 +149,9 @@ rule combine_errors:
     message:
         'Combine errors: {wildcards.name}'
     shell:
-        '%s/combine_errors.py -f {input.filtered} -c {input.candidate} -l {input.labels} '
-        '-s {input.segments} -o {output}' % DIR
+        '{dir}/combine_errors.py -f {{input.filtered}} -c {{input.candidate}} -l {{input.labels}} '
+        '-s {{input.segments}} -o {{output}} --coverage {coverage} --cons-ratio {ratio}' \
+            .format(dir=DIR, coverage=config['split_coverage'], ratio=config['consensus_ratio'])
 
 
 rule clip_and_filter:

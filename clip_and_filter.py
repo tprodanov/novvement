@@ -20,6 +20,7 @@ def main():
                          type=argparse.FileType('w'), required=True, metavar='File')
 
     cl_args = parser.add_argument_group('Clipping arguments')
+    cl_args.add_argument('--no-clipping', help='Do not clip segments', action='store_true')
     cl_args.add_argument('-r', '--range', help='Positions range (default: %(default)s)',
                          metavar=('Int', 'Int'), type=int, nargs=2, default=[40, 290])
 
@@ -41,6 +42,7 @@ def main():
                                  str(args.min_dist),
                                  str(args.range[0]),
                                  str(args.range[1])],
+                                 str(args.no_clipping),
                                 stdin=args.sequences,
                                 stdout=args.output).returncode
     if returncode != 0:

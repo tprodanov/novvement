@@ -1,1 +1,1 @@
-__version__ = 'novVement 1.7.37 10-10-2017\ncreated by Timofey Prodanov (timofey.prodanov@gmail.com)'
+__version__ = 'novVement 1.7.38 10-10-2017\ncreated by Timofey Prodanov (timofey.prodanov@gmail.com)'

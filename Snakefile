@@ -158,7 +158,7 @@ rule clip_and_filter:
     input:
         bin=os.path.abspath('%s/bin/clip_and_filter' % DIR),
         combined='%s/data/{name}/combined.csv' % OUTP,
-        segments=config['segments']
+        segments=config['segments'] if config['clipped_segments'] is None else config['clipped_segments']
     output:
         '%s/data/{name}/clipped_filtered.csv' % OUTP
     message:
@@ -166,9 +166,11 @@ rule clip_and_filter:
     shell:
         'tail -n+3 {{input.combined}} | cut -f4 | ' \
         '{dir}/clip_and_filter.py -s - -S {{input.segments}} -o {{output}} ' \
-        '--range {range[0]} {range[1]} --min-dist {min_dist}'.format(dir=DIR,
-                                                                     range=config['range'],
-                                                                     min_dist=config['min_dist'])
+        '--range {range[0]} {range[1]} --min-dist {min_dist}{no_clipping}' \
+                .format(dir=DIR,
+                        range=config['range'],
+                        min_dist=config['min_dist'],
+                        no_clipping='' if config['clipped_segments'] is None else ' --no-clipping')
 
 
 rule concat_sequences:

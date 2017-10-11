@@ -13,6 +13,9 @@ def create_parser():
                          required=True, metavar='File')
     io_args.add_argument('-s', '--segments', help='File with germline segments in fasta format',
                          required=True, metavar='File')
+    io_args.add_argument('-S', '--clipped-segments',
+                         help='(Optional) Already clipped germline segments in fasta format',
+                         metavar='File')
     io_args.add_argument('-o', '--output', help='Output directory',
                          required=True, metavar='Dir')
 

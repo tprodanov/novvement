@@ -25,7 +25,8 @@ bool compare_with_target(std::string const& seq, std::vector<std::string> const&
 }
 
 
-std::vector<std::string> load_segments(std::istream& inp, size_t start, size_t length) {
+std::vector<std::string> load_segments(std::istream& inp, bool already_clipped,
+            size_t start = -1, size_t length = -1) {
     std::vector<std::string> res;
     std::string seq;
     std::string current;
@@ -34,7 +35,9 @@ std::vector<std::string> load_segments(std::istream& inp, size_t start, size_t l
         getline(inp, current);
         if (current[0] == '>') {
             if (!seq.empty() && seq.length() > start) {
-                seq = seq.substr(start, length);
+                if (!already_clipped) {
+                    seq = seq.substr(start, length);
+                }
                 std::transform(seq.begin(), seq.end(), seq.begin(), ::toupper);
                 res.push_back(seq);
             }
@@ -45,7 +48,9 @@ std::vector<std::string> load_segments(std::istream& inp, size_t start, size_t l
     }
 
     if (!seq.empty() && seq.length() > start) {
-        seq = seq.substr(start, length);
+        if (!already_clipped) {
+            seq = seq.substr(start, length);
+        }
         std::transform(seq.begin(), seq.end(), seq.begin(), ::toupper);
         res.push_back(seq);
     }
@@ -76,8 +81,9 @@ void filter_sequences(std::istream& sequences,
 
 
 int main(int argc, char* argv[]) {
-    if (argc != 5) {
-        std::cerr << "argv should contain exactly 4 arguments: segments, min_dist, left, right" << std::endl;
+    if (argc != 6) {
+        std::cerr << "argv should contain exactly 5 arguments: segments, min_dist, left, right, already_clipped"
+                  << std::endl;
         exit(1);
     }
 
@@ -94,6 +100,8 @@ int main(int argc, char* argv[]) {
 
     --left;
     size_t length = right - left;
+
+    bool already_clipped = std::string(argv[5]) == "True";
 
     std::vector<std::string> segments = load_segments(segments_f, left, length);
     filter_sequences(std::cin, segments, left, length, min_dist, std::cout);

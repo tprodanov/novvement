@@ -103,6 +103,6 @@ int main(int argc, char* argv[]) {
 
     bool already_clipped = std::string(argv[5]) == "True";
 
-    std::vector<std::string> segments = load_segments(segments_f, left, length);
+    std::vector<std::string> segments = load_segments(segments_f, already_clipped, left, length);
     filter_sequences(std::cin, segments, left, length, min_dist, std::cout);
 }

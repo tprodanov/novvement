@@ -33,7 +33,7 @@ def write_component(component_num, lines, outp, outp_edges,
         for j in range(i + 1, len(seqs)):
             seq2 = seqs[j]
             if hamming_distance(seq1, seq2) <= max_distance:
-                outp_edges.write('%d\t%d\t%d\t0\t0\n' % (component_num, i, j))
+                outp_edges.write('%d\t%d\t%d\t1\n' % (component_num, i, j))
 
     for i, (combinations, labels) in enumerate(novel):
         for novel_str in novel_entries(combinations, labels):
@@ -43,7 +43,7 @@ def write_component(component_num, lines, outp, outp_edges,
 def analyze_file(f, outp, outp_edges,
                  **kwargs):
     outp.write('component\tnovel\tsize\tlabel\n')
-    outp_edges.write('component\tx1\tx2\ty1\ty2\n')
+    outp_edges.write('component\tx1\tx2\ty\n')
     while next(f).startswith('#'):
         pass
     

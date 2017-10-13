@@ -41,8 +41,8 @@ def main():
                                  args.segments,
                                  str(args.min_dist),
                                  str(args.range[0]),
-                                 str(args.range[1])],
-                                 str(args.no_clipping),
+                                 str(args.range[1]),
+                                 str(args.no_clipping)],
                                 stdin=args.sequences,
                                 stdout=args.output).returncode
     if returncode != 0:

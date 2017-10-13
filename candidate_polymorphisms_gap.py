@@ -19,7 +19,7 @@ def analyze_segment(counter, gap):
     sorted_errors = counter.most_common()[::-1]
 
     for i in range(1, len(sorted_errors)):
-        if sorted_errors[i][1] - sorted_errors[i - 1][1] >= gap * sorted_errors[i - 1][1] > 1:
+        if sorted_errors[i][1] >= (1 + gap) * sorted_errors[i - 1][1] > 1:
             return list(map(itemgetter(0), sorted_errors[i:]))
     return []
 

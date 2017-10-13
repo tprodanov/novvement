@@ -58,7 +58,7 @@ class ReadsSubset:
         category = self.__best_category()
         category_reads = self.categorized[category]
 
-        if len(category_reads) < coverage:
+        if len(category_reads) < coverage or self.coverage - len(category_reads) < coverage:
             return None
 
         self.reads = self.__reduce_reads(category_reads)
@@ -171,14 +171,17 @@ def reads_labels(reads, labels):
     return ','.join('%s:%d' % item for item in reads_labels.most_common())
 
 
-def write_subsets(reads_subsets, labels, segments, outp, coverage, consensus_ratio):
+def filter_subsets(reads_subsets, coverage):
+    return (subset for subset in sorted(reads_subsets, key=lambda subset: (subset.segment, -subset.coverage))
+                              if subset.coverage >= coverage)
+
+
+def write_subsets(reads_subsets, labels, segments, outp,
+                  *, consensus_ratio):
     import sys
     outp.write('# %s\n' % ' '.join(sys.argv))
     outp.write('segment\tcombination\tlabels\tseq\n')
     for subset in reads_subsets:
-        if subset.coverage < coverage:
-            continue
-
         consensus = subset.consensus(consensus_ratio)
         seq = create_seq(segments[subset.segment], consensus)
 
@@ -187,6 +190,38 @@ def write_subsets(reads_subsets, labels, segments, outp, coverage, consensus_rat
                         combination=','.join('%d:%s' % item for item in consensus) if consensus else '*',
                         labels=reads_labels(subset.reads, labels),
                         seq=seq))
+
+def write_subsets_long(reads_subsets, labels, outp,
+                       *, coverage, consensus_ratio):
+    import sys
+    import re
+    outp.write('# %s\n' % ' '.join(sys.argv))
+    outp.write('segment\tsegment_num\tsubset\tsubset_num\tcoverage\tlabels\tread\tpos\talt\n')
+
+    prev_segment = None
+    segment_num = -1
+    for subset in filter_subsets(reads_subsets, 0):
+        if prev_segment != subset.segment:
+            segment_num += 1
+            subset_num = 0
+            prev_segment = subset.segment
+
+        consensus = subset.consensus(consensus_ratio)
+        consensus = ','.join('%d:%s' % item for item in consensus) if consensus else '*'
+
+        current_labels = reads_labels(subset.reads, labels)
+        current_labels = sum(x >= 5 for x in map(int, re.split(',|:', current_labels)[1::2]))
+
+        for read_num, (read, read_errors) in enumerate(subset.reads):
+            for pos, alt in read_errors:
+                outp.write('{segment}\t{segment_num}\t{subset}\t{subset_num}\t{coverage}\t{labels}\t{read}\t{pos}\t{alt}\n'
+                                .format(segment=subset.segment, segment_num=segment_num,
+                                        subset=consensus, subset_num=subset_num, coverage=subset.coverage,
+                                        labels=current_labels, read=read_num, pos=pos, alt=alt))
+
+        if subset.coverage >= coverage:
+            subset_num += 1
+
 
 
 def main():
@@ -208,6 +243,7 @@ def main():
                          type=argparse.FileType(), required=True, metavar='File')
     io_args.add_argument('-o', '--output', help='Output csv file',
                          type=argparse.FileType('w'), required=True, metavar='File')
+    io_args.add_argument('--long', help='Long output format', action='store_true')
 
     sc_args = parser.add_argument_group('Split and consensus arguments')
     sc_args.add_argument('--coverage', type=int, metavar='Int', default=100,
@@ -229,8 +265,13 @@ def main():
 
     reads_subsets = initialize_reads_subsets(reads, segments, candidate)
     reads_subsets = traverse_reads_subsets(reads_subsets, args.coverage)
-    write_subsets(reads_subsets, labels, segments, args.output,
-                  args.coverage, args.cons_ratio)
+    if not args.long:
+        write_subsets(filter_subsets(reads_subsets, coverage=args.coverage),
+                      labels, segments, args.output,
+                      consensus_ratio=args.cons_ratio)
+    else:
+        write_subsets_long(reads_subsets, labels, args.output,
+                           coverage=args.coverage, consensus_ratio=args.cons_ratio)
 
 
 if __name__ == '__main__':

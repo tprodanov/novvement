@@ -30,13 +30,13 @@ def create_parser():
                            type=int, metavar='Int', default=100,
                            help='Minimal segment coverage (default: %(default)s)')
     filt_args.add_argument('--keep-n', action='store_true',
-                           help='Do not filter out mismatches with nN as a substitute')
+                           help='Do not filter out mismatches with N as a substitute')
 
     det_args = parser.add_argument_group('Candidate polymorphisms detection')
     det_args.add_argument('--det-method', help='Candidate detection method (default: %(default)s)',
                           choices=['gap', 'quantile'], metavar='gap|quantile', default='gap')
     det_args.add_argument('--gap-size', metavar='Float', type=float, default=0.5,
-                          help='Relative gap size (if --method gap) (default: %(default)s')
+                          help='Relative gap size (if --method gap) (default: %(default)s)')
     det_args.add_argument('--multiplier', metavar='Float', type=float, default=4,
                           help='Quantile multiplier (if --det-method quantile):\n'
                           'We select positions with number of errors at least\n'

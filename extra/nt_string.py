@@ -6,17 +6,17 @@ class FastaRead:
         self.seq = seq.upper()
 
     def __str__(self):
-        return '%s\n%s\n' % (self.name, self.seq)
+        return '>%s\n%s\n' % (self.name, self.seq)
 
 
 def read_fasta(f):
-    name = next(f).strip()
+    name = next(f).strip()[1:]
     current_sequence = []
     for line in f:
         if line[0] == '>':
             yield FastaRead(name, ''.join(current_sequence))
             current_sequence = []
-            name = line.strip()
+            name = line.strip()[1:]
         else:
             current_sequence.append(line.strip().upper())
     yield FastaRead(name, ''.join(current_sequence))
@@ -30,7 +30,7 @@ class FastqRead:
 
     @staticmethod
     def from_file(f):
-        name = next(f).strip()
+        name = next(f).strip()[1:]
         seq = next(f).strip()
         next(f)
         quality = next(f).strip()
@@ -43,7 +43,7 @@ class FastqRead:
         return quality_sum / len(self.quality)
 
     def __str__(self):
-        return '%s\n%s\n+\n%s\n' % (self.name, self.seq, self.quality)
+        return '@%s\n%s\n+\n%s\n' % (self.name, self.seq, self.quality)
 
 
 def read_fastq(f):
@@ -75,4 +75,11 @@ def read_fastaq(f, default_ext='fq'):
         return read_fastq(f)
     else:
         return read_fasta(f)
+
+
+def write_fasta_entry(name, seq, outp):
+    outp.write('>%s\n' % name)
+    for i in range(0, len(seq), 80):
+        outp.write(seq[i : i + 80])
+        outp.write('\n')
 

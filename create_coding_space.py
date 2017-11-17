@@ -166,6 +166,7 @@ def read_input(f, tau, margins):
 
 def write_output(vertices, seqs, outp_fa, outp_aln):
     from operator import attrgetter
+    from extra import nt_string
     vertices.sort(key=attrgetter('name'))
 
     if outp_aln:
@@ -175,12 +176,8 @@ def write_output(vertices, seqs, outp_fa, outp_aln):
             outp_aln.write('%-20s %s\n' % (vertex.name, seqs[vertex.name]))
 
     for vertex in vertices:
-        outp_fa.write('>%s\n' % vertex.name)
         seq = seqs[vertex.name].upper().replace('-', '')
-        assert '>' not in seq
-        for i in range(0, len(seq), 80):
-            outp_fa.write(seq[i : i + 80])
-            outp_fa.write('\n')
+        nt_string.write_fasta_entry(vertex.name, seq, outp_fa)
 
 
 def main():

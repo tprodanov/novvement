@@ -99,7 +99,7 @@ def create_seq(seq, combination):
 
 
 def load_segments(segments_fa):
-    return {entry.name[1:]: entry.seq for entry in segments_fa}
+    return {entry.name: entry.seq for entry in segments_fa}
 
 
 def load_reads(f, labels):

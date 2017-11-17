@@ -16,7 +16,7 @@ def load_errors(f):
 
 def analyze_segment(counter, quantile, multiplier):
     sorted_errors = counter.most_common()
-    q = sorted_errors[(100 - quantile) * len(sorted_errors) // 100][1]
+    q = sorted_errors[int((100 - quantile) * len(sorted_errors) // 100)][1]
     
     for pos_alt, count in sorted_errors:
         if count >= multiplier * q:

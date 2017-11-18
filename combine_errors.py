@@ -2,25 +2,15 @@
 
 
 import collections
-
-
-def load_candidate(f):
-    candidate = collections.defaultdict(set)
-
-    while next(f).startswith('#'):
-        pass
-    for line in f:
-        segment, position, alt = line.strip().split()
-        position = int(position)
-        candidate[segment].add((position, alt))
-
-    return candidate
+import itertools
 
 
 class ReadsSubset:
-    def __init__(self, segment, candidate, reads, coverage=None):
+    tuple_size = None
+
+    def __init__(self, segment, already_used, reads, coverage=None):
         self.segment = segment
-        self.candidate = candidate
+        self.already_used = already_used
         self.reads = reads
         if coverage is not None:
             self.coverage = coverage
@@ -30,15 +20,12 @@ class ReadsSubset:
         self.categorized = collections.defaultdict(list)
         self.__categorize_errors()
 
-    def __read_candidate_errors(self, errors):
-        return tuple(sorted(error for error in errors if error in self.candidate))
-
     def __categorize_errors(self):
         self.categorized.clear()
         for name, errors in self.reads:
-            read_category = self.__read_candidate_errors(errors)
-            if read_category:
-                self.categorized[read_category].append((name, errors))
+            read_errors = [error for error in errors if error not in self.already_used]
+            for tup in itertools.combinations(read_errors, ReadsSubset.tuple_size):
+                self.categorized[tup].append((name, errors))
 
     def __best_category(self):
         m = 0
@@ -54,21 +41,33 @@ class ReadsSubset:
         names = set(map(itemgetter(0), category_reads))
         return [read for read in self.reads if read[0] not in names]
 
-    def split_if_needed(self, coverage):
-        category = self.__best_category()
-        category_reads = self.categorized[category]
+    def split_if_needed(self, split_coverage, similarity_rate):
+        while True:
+            category = self.__best_category()
+            if category is None:
+                return None
 
-        if len(category_reads) < coverage or self.coverage - len(category_reads) < coverage:
-            return None
+            category_reads = self.categorized[category]
+            self.already_used |= set(category)
+
+            if len(category_reads) < split_coverage:
+                return None
+            if self.coverage - len(category_reads) < split_coverage:
+                self.__categorize_errors()
+            else:
+                break
+
+        for other_category, other_reads in self.categorized.items():
+            if len(other_reads) >= similarity_rate * len(category_reads):
+                self.already_used |= set(other_category)
 
         self.reads = self.__reduce_reads(category_reads)
-        self.candidate -= set(category)
         self.coverage -= len(category_reads)
         self.__categorize_errors()
 
-        return ReadsSubset(self.segment, self.candidate, category_reads)
+        return ReadsSubset(self.segment, self.already_used, category_reads)
 
-    def consensus(self, min_ratio=0.51):
+    def consensus(self):
         frequences = collections.Counter()
         for _, read_errors in self.reads:
             for error in read_errors:
@@ -76,7 +75,7 @@ class ReadsSubset:
 
         result = []
         for error, count in frequences.items():
-            if count >= min_ratio * self.coverage:
+            if count > .5 * self.coverage:
                 result.append(error)
         return sorted(result)
 
@@ -116,7 +115,7 @@ def load_reads(f, labels):
         position = int(position)
         if read != last_read:
             if last_read in labels:
-                reads[last_segment].append((last_read, read_errors))
+                reads[last_segment].append((last_read, sorted(read_errors)))
             last_read = read
             last_segment = segment
             read_errors = []
@@ -124,8 +123,9 @@ def load_reads(f, labels):
         read_errors.append((position, alt))
 
     if last_read in labels:
-        reads[last_segment].append((last_read, read_errors))
+        reads[last_segment].append((last_read, sorted(read_errors)))
     return reads
+
 
 def load_labels(f):
     while next(f).startswith('#'):
@@ -133,18 +133,19 @@ def load_labels(f):
     return dict(line.strip().split() for line in f)
 
 
-def initialize_reads_subsets(reads, segments, candidate):
+def initialize_reads_subsets(reads, segments, tuple_size):
+    ReadsSubset.tuple_size = tuple_size
     reads_subsets = {}
     for segment in segments:
         if segment not in reads:
             continue
         reads_subsets[segment] = ReadsSubset(segment,
-                                             candidate.get(segment, set()),
+                                             set(),
                                              reads[segment])
     return reads_subsets
 
 
-def traverse_reads_subsets(reads_subsets, coverage):
+def traverse_reads_subsets(reads_subsets, coverage, split_coverage, similarity_rate):
     stack = list(reads_subsets.values())
     result = []
 
@@ -154,7 +155,7 @@ def traverse_reads_subsets(reads_subsets, coverage):
             result.append(current)
             continue
         
-        novel = current.split_if_needed(coverage)
+        novel = current.split_if_needed(split_coverage, similarity_rate)
         if novel:
             stack.append(current)
             stack.append(novel)
@@ -176,13 +177,12 @@ def filter_subsets(reads_subsets, coverage):
                               if subset.coverage >= coverage)
 
 
-def write_subsets(reads_subsets, labels, segments, outp,
-                  *, consensus_ratio):
+def write_subsets(reads_subsets, labels, segments, outp):
     import sys
     outp.write('# %s\n' % ' '.join(sys.argv))
     outp.write('segment\tcombination\tlabels\tseq\n')
     for subset in reads_subsets:
-        consensus = subset.consensus(consensus_ratio)
+        consensus = subset.consensus()
         seq = create_seq(segments[subset.segment], consensus)
 
         outp.write('{segment}\t{combination}\t{labels}\t{seq}\n'
@@ -192,7 +192,7 @@ def write_subsets(reads_subsets, labels, segments, outp,
                         seq=seq))
 
 def write_subsets_long(reads_subsets, labels, outp,
-                       *, coverage, consensus_ratio):
+                       *, coverage):
     import sys
     import re
     outp.write('# %s\n' % ' '.join(sys.argv))
@@ -206,7 +206,7 @@ def write_subsets_long(reads_subsets, labels, outp,
             subset_num = 0
             prev_segment = subset.segment
 
-        consensus = subset.consensus(consensus_ratio)
+        consensus = subset.consensus()
         consensus = ','.join('%d:%s' % item for item in consensus) if consensus else '*'
 
         current_labels = reads_labels(subset.reads, labels)
@@ -235,8 +235,6 @@ def main():
     io_args = parser.add_argument_group('Input/output arguments')
     io_args.add_argument('-f', '--filtered', help='Input csv file with filtered errors',
                          type=argparse.FileType(), required=True, metavar='File')
-    io_args.add_argument('-c', '--candidate', help='Input csv file with candidate polymorphisms',
-                         type=argparse.FileType(), required=True, metavar='File')
     io_args.add_argument('-l', '--labels', help='Input csv file with read labels',
                          type=argparse.FileType(), required=True, metavar='File')
     io_args.add_argument('-s', '--segments', help='Fasta file with segments',
@@ -246,11 +244,14 @@ def main():
     io_args.add_argument('--long', help='Long output format', action='store_true')
 
     sc_args = parser.add_argument_group('Split and consensus arguments')
+    sc_args.add_argument('--peaks', type=int, metavar='Int', default=2,
+                         help='Number of peaks used in splitting (default: %(default)s)')
     sc_args.add_argument('--coverage', type=int, metavar='Int', default=100,
-                         help='Minimal coverage of a reads subset (default: %(default)s')
-    sc_args.add_argument('--cons-ratio', type=float, metavar='Float', default=0.51,
-                         help='Ratio for a new polymorphisms to be chosen.\n'
-                         'Should be higher than 0.5 (default: %(default)s)')
+                         help='Minimal coverage of a reads subset (default: %(default)s)')
+    sc_args.add_argument('--spl-coverage', type=int, metavar='Int',
+                         help='Minimal coverage of subsets in splitting (default: --coverage / 2)')
+    sc_args.add_argument('--similarity', type=float, metavar='Float', default=.95,
+                         help='Peaks removal threshold (default: %(default)s)')
 
     other = parser.add_argument_group('Other arguments')
     other.add_argument('-h', '--help', action='help', help='Show this message and exit')
@@ -258,20 +259,21 @@ def main():
 
     args = parser.parse_args()
 
-    candidate = load_candidate(args.candidate)
+    if args.spl_coverage is None:
+        args.spl_coverage = args.coverage // 2
+
     segments = load_segments(nt_string.read_fasta(args.segments))
     labels = load_labels(args.labels)
     reads = load_reads(args.filtered, labels)
 
-    reads_subsets = initialize_reads_subsets(reads, segments, candidate)
-    reads_subsets = traverse_reads_subsets(reads_subsets, args.coverage)
+    reads_subsets = initialize_reads_subsets(reads, segments, args.peaks)
+    reads_subsets = traverse_reads_subsets(reads_subsets, args.coverage, args.spl_coverage, args.similarity)
     if not args.long:
         write_subsets(filter_subsets(reads_subsets, coverage=args.coverage),
-                      labels, segments, args.output,
-                      consensus_ratio=args.cons_ratio)
+                      labels, segments, args.output)
     else:
         write_subsets_long(reads_subsets, labels, args.output,
-                           coverage=args.coverage, consensus_ratio=args.cons_ratio)
+                           coverage=args.coverage)
 
 
 if __name__ == '__main__':

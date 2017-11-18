@@ -32,28 +32,17 @@ def create_parser():
     filt_args.add_argument('--keep-n', action='store_true',
                            help='Do not filter out mismatches with N as a substitute')
 
-    det_args = parser.add_argument_group('Candidate polymorphisms detection')
-    det_args.add_argument('--det-method', help='Candidate detection method (default: %(default)s)',
-                          choices=['gap', 'quantile'], metavar='gap|quantile', default='gap')
-    det_args.add_argument('--gap-size', metavar='Float', type=float, default=0.5,
-                          help='Relative gap size (if --method gap) (default: %(default)s)')
-    det_args.add_argument('--multiplier', metavar='Float', type=float, default=4,
-                          help='Quantile multiplier (if --det-method quantile):\n'
-                          'We select positions with number of errors at least\n'
-                          '<--multiplier> * <--quantile quantile of errors per position>\n'
-                          '(default: %(default)s)')
-    det_args.add_argument('--quantile', metavar='Float', type=float, default=95,
-                          help='Quantile used for comparison (if --det-method quantile)\n'
-                          '(default: %(default)s)')
-    
     sc_args = parser.add_argument_group('Spliting reads and finding a consensus')
-    sc_args.add_argument('--spl-cov', '--split-coverage', dest='split_coverage',
-                         type=int, metavar='INT', default=100,
+    sc_args.add_argument('--peaks', type=int, metavar='Int', default=2,
+                         help='Number of peaks used in splitting (default: 2)')
+    sc_args.add_argument('--sub-cov', '--subset-coverage', dest='subset_coverage',
+                         type=int, metavar='Int', default=100,
                          help='Minimal coverage of a reads subset (default: %(default)s)')
-    sc_args.add_argument('--cons-ratio', '--consensus-ratio', dest='consensus_ratio',
-                         type=float, metavar='FLOAT', default=0.51,
-                         help='Ratio for a new polymorphisms to be chosen.\n'
-                              'Should be higher than 0.5 (default: %(default)s)')
+    sc_args.add_argument('--spl-cov', '--split-coverage', dest='split_coverage',
+                         type=int, metavar='Int',
+                         help='Minimal coverage of subsets in splitting (default: --sub-cov / 2)')
+    sc_args.add_argument('--similarity', type=float, metavar='Float', default=0.95,
+                         help='Peaks removal threshold (default: %(default)s)')
             
     hl_args = parser.add_argument_group('Merging labels using Hamming graph')
     hl_args.add_argument('--labels-tau', metavar='Int', type=int, default=3,
@@ -86,6 +75,8 @@ def main():
 
     parser = create_parser()
     args = parser.parse_args()
+    if args.split_coverage is None:
+        args.split_coverage = args.subset_coverage // 2
     
     args.script_dir = os.path.abspath(os.path.dirname(__file__))
     snakefile = os.path.join(args.script_dir, 'Snakefile')

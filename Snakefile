@@ -86,33 +86,6 @@ rule filter_errors:
                                                                        threshold=config['segment_coverage'],
                                                                        keep_n=' --keep-n' if config['keep_n'] else '')
 
-
-det_method = config['det_method']
-if det_method == 'gap':
-    det_args = '--gap {gap}'.format(gap=config['gap_size'])
-elif det_method == 'quantile':
-    det_args = '--multiplier {multiplier} --quantile {quantile}'.format(multiplier=config['multiplier'],
-                                                                        quantile=config['quantile'])
-
-
-rule candidate_polymorphisms:
-    input:
-        '%s/data/{name}/filtered.csv' % OUTP
-    output:
-        '%s/data/{name}/candidate.csv' % OUTP
-    message:
-        'Detecting candidate polymorphisms: {wildcards.name}'
-    shell:
-        '{dir}/candidate_polymorphisms_{method}.py -i {{input}} -o {{output}} {args}' \
-            .format(dir=DIR,
-                    method=det_method,
-                    args=det_args)
-
-
-def expansion_name(wildcards):
-    return '%s/data/%s/expanded.%d.csv' % (OUTP, wildcards['name'], int(wildcards['num']) - 1)
-
-
 rule compile:
     input:
         os.path.abspath('%s/src/{name}.cpp' % DIR)
@@ -141,7 +114,6 @@ rule hamming_labels:
 rule combine_errors:
     input:
         filtered='%s/data/{name}/filtered.csv' % OUTP,
-        candidate='%s/data/{name}/candidate.csv' % OUTP,
         labels='%s/data/{name}/labels.csv' % OUTP,
         segments=config['segments']
     output:
@@ -149,9 +121,11 @@ rule combine_errors:
     message:
         'Combine errors: {wildcards.name}'
     shell:
-        '{dir}/combine_errors.py -f {{input.filtered}} -c {{input.candidate}} -l {{input.labels}} '
-        '-s {{input.segments}} -o {{output}} --coverage {coverage} --cons-ratio {ratio}' \
-            .format(dir=DIR, coverage=config['split_coverage'], ratio=config['consensus_ratio'])
+        '{dir}/combine_errors.py -f {{input.filtered}} -l {{input.labels}} '
+        '-s {{input.segments}} -o {{output}} --peaks {peaks} '
+        '--coverage {coverage} --spl-coverage {spl_coverage} --similarity {similarity}' \
+            .format(dir=DIR, coverage=config['subset_coverage'], peaks=config['peaks'],
+                    spl_coverage=config['split_coverage'], similarity=config['similarity'])
 
 
 rule clip_and_filter:

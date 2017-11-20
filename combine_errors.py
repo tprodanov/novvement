@@ -191,37 +191,24 @@ def write_subsets(reads_subsets, labels, segments, outp):
                         labels=reads_labels(subset.reads, labels),
                         seq=seq))
 
-def write_subsets_long(reads_subsets, labels, outp,
-                       *, coverage):
+def write_subsets_long(reads_subsets, labels, outp, *, coverage):
     import sys
     import re
     outp.write('# %s\n' % ' '.join(sys.argv))
-    outp.write('segment\tsegment_num\tsubset\tsubset_num\tcoverage\tlabels\tread\tpos\talt\n')
+    outp.write('segment\tsubset\tcoverage\tlabel\tread\tpos\talt\n')
 
-    prev_segment = None
-    segment_num = -1
     for subset in filter_subsets(reads_subsets, 0):
-        if prev_segment != subset.segment:
-            segment_num += 1
-            subset_num = 0
-            prev_segment = subset.segment
-
         consensus = subset.consensus()
-        consensus = ','.join('%d:%s' % item for item in consensus) if consensus else '*'
+        consensus = '"%s. Coverage: %d%s"' % (','.join('%d:%s' % item for item in consensus) if consensus else '*',
+                                              subset.coverage,
+                                              ' (Not enough coverage)' if subset.coverage < coverage else '')
 
-        current_labels = reads_labels(subset.reads, labels)
-        current_labels = sum(x >= 5 for x in map(int, re.split(',|:', current_labels)[1::2]))
-
-        for read_num, (read, read_errors) in enumerate(subset.reads):
+        for read, read_errors in subset.reads:
             for pos, alt in read_errors:
-                outp.write('{segment}\t{segment_num}\t{subset}\t{subset_num}\t{coverage}\t{labels}\t{read}\t{pos}\t{alt}\n'
-                                .format(segment=subset.segment, segment_num=segment_num,
-                                        subset=consensus, subset_num=subset_num, coverage=subset.coverage,
-                                        labels=current_labels, read=read_num, pos=pos, alt=alt))
-
-        if subset.coverage >= coverage:
-            subset_num += 1
-
+                outp.write('{segment}\t{subset}\t{coverage}\t{label}\t{read}\t{pos}\t{alt}\n'
+                                .format(segment=subset.segment,
+                                        subset=consensus, coverage=subset.coverage,
+                                        label=labels[read], read=read, pos=pos, alt=alt))
 
 
 def main():

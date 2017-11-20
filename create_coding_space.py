@@ -15,6 +15,13 @@ class Vertex:
         self.edges.remove(other)
         other.edges.remove(self)
 
+    def remove_neighbours(self):
+        neighbours = list(self.edges)
+        for other in neighbours:
+            other.edges.remove(self)
+        self.edges.clear()
+        return neighbours
+
     def distance(self, other):
         return sum(nt1 != nt2 for nt1, nt2 in zip(self.seq, other.seq))
 
@@ -74,10 +81,22 @@ class Graph:
     def remove_by(self, selector):
         vertex = selector(self.vertices)
         # print('Removing', vertex)
-
-        for other in list(vertex.edges):
-            vertex.remove_edge(other)
+        vertex.remove_neighbours()
         self.vertices.remove(vertex)
+
+    def remove_first_allele_neighbours(self):
+        to_delete = set()
+
+        for vertex in self.vertices:
+            if vertex in to_delete:
+                continue
+            if vertex.allele() == 1:
+                neighbours = vertex.remove_neighbours()
+                to_delete |= set(neighbours)
+
+        for vertex in to_delete:
+            vertex.remove_neighbours()
+            self.vertices.remove(vertex)
 
 
 def decompose_graph(graph, selector):
@@ -148,10 +167,7 @@ def prepare_selector(args, all_vertices):
         return select_by_alleles(alleles)
 
 
-def read_input(f, tau, margins):
-    l, r = margins
-    l -= 1
-
+def read_input(f, tau):
     graph = Graph()
     seqs = {}
     for line in f:
@@ -159,7 +175,10 @@ def read_input(f, tau, margins):
         if not line:
             continue
         name, seq = line.split()
-        graph.add_seq(name, seq[l:r].upper(), tau)
+        positions = [i for i, nt in enumerate(seq) if nt != '-' if nt.upper() == nt]
+        assert positions
+
+        graph.add_seq(name, seq[min(positions) : max(positions) + 1], tau)
         seqs[name] = seq
     return graph, seqs
 
@@ -196,13 +215,11 @@ def main():
     io_args.add_argument('-c', '--coverage', help='Optional input file containing segment coverage',
                          metavar='File', type=argparse.FileType())
 
-    seq_args = parser.add_argument_group('Sequences arguments')
-    seq_args.add_argument('--range', help='Positions range (including spaces) (default: %(default)s)',
-                          metavar=('Int', 'Int'), type=int, nargs=2, default=[55, 433])
-    
     gr_args = parser.add_argument_group('Graph arguments')
     gr_args.add_argument('-t', '--tau', help='Hamming distance between sequences (default: %(default)s)',
                          type=int, metavar='Int', default=4)
+    gr_args.add_argument('-1', '--first-allele', help='Remove neighbours of the first allele (*01)',
+                         action='store_true')
     gr_args.add_argument('-r', '--resolution',
                          help='Component resolution method:\n'
                               '  edges    - remove vertices with the most edges\n'
@@ -217,7 +234,10 @@ def main():
     
     args = parser.parse_args()
     
-    graph, seqs = read_input(args.input, args.tau, args.range)
+    graph, seqs = read_input(args.input, args.tau)
+    if args.first_allele:
+        graph.remove_first_allele_neighbours()
+
     selector = prepare_selector(args, graph.vertices)
     vertices = list(decompose_graph(graph, selector))
     write_output(vertices, seqs, args.output, args.alignment)

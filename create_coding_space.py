@@ -39,6 +39,7 @@ class Vertex:
 
 
 class Graph:
+    removed_total = 0
     def __init__(self, vertices=None):
         self.vertices = set()
         if vertices:
@@ -49,6 +50,8 @@ class Graph:
         current = Vertex(name, seq)
         for vertex in self.vertices:
             if vertex.distance(current) <= tau:
+#                if current.allele() == vertex.allele() == 1:
+#                    print(current.name, vertex.name, vertex.distance(current), sep='\t')
                 vertex.add_edge(current)
 
         self.vertices.add(current)
@@ -79,10 +82,11 @@ class Graph:
                 yield list(self.traverse(vertex, visited))
 
     def remove_by(self, selector):
-        vertex = selector(self.vertices)
-        # print('Removing', vertex)
-        vertex.remove_neighbours()
-        self.vertices.remove(vertex)
+        for vertex in selector(self.vertices):
+            # print('Removing', vertex)
+            vertex.remove_neighbours()
+            self.vertices.remove(vertex)
+            Graph.removed_total += 1
 
     def remove_first_allele_neighbours(self):
         to_delete = set()
@@ -93,7 +97,8 @@ class Graph:
             if vertex.allele() == 1:
                 neighbours = vertex.remove_neighbours()
                 to_delete |= set(neighbours)
-
+        
+        print('Deleting neighbours of the dominant alleles:', len(to_delete))
         for vertex in to_delete:
             vertex.remove_neighbours()
             self.vertices.remove(vertex)
@@ -131,20 +136,23 @@ def argmax(vertices, fun):
 
 
 def select_by_edges(vertices):
-    return argmax(vertices, Vertex.len_edges)
+    return [argmax(vertices, Vertex.len_edges)]
+
+def select_opposite_edges(vertices):
+    return list(argmax(vertices, Vertex.len_edges).edges)
 
 
 def select_by_coverage(coverages):
     fitness = lambda vertex: -coverages.get(vertex.name, 0)
     def inner(vertices):
-        return argmax(vertices, fitness)
+        return [argmax(vertices, fitness)]
     return inner
 
 
 def select_by_alleles(max_alleles):
     fitness = lambda vertex: (vertex.allele() - 1) / max_alleles[vertex.group()]
     def inner(vertices):
-        return argmax(vertices, fitness)
+        return [argmax(vertices, fitness)]
     return inner
 
 
@@ -152,6 +160,8 @@ def prepare_selector(args, all_vertices):
     import collections
     if args.resolution == 'edges':
         return select_by_edges
+    if args.resolution == 'nedges':
+        return select_opposite_edges
 
     if args.resolution == 'coverage':
         coverages = {}
@@ -199,6 +209,27 @@ def write_output(vertices, seqs, outp_fa, outp_aln):
         nt_string.write_fasta_entry(vertex.name, seq, outp_fa)
 
 
+def describe_graph(graph):
+    from collections import Counter
+
+    print('Total %d vertices' % len(graph.vertices))
+    groups = { vertex.group() for vertex in graph.vertices }
+    print('Total %d groups' % len(groups))
+
+    components = list(graph.components())
+    dominant_counter = Counter()
+    for component in components:
+        dominant = sum(vertex.allele() == 1 for vertex in component)
+        dominant_counter[dominant] += 1
+
+    print('%d orphans' % dominant_counter[0])
+    print('%d single-centre components' % dominant_counter[1])
+    print('%d multi-centre components' %
+            (sum(dominant_counter.values()) - dominant_counter[1] - dominant_counter[0]))
+    print(dominant_counter)
+
+
+
 def main():
     import argparse
     from extra._version import __version__
@@ -214,6 +245,7 @@ def main():
                          metavar='File', type=argparse.FileType('w'))
     io_args.add_argument('-c', '--coverage', help='Optional input file containing segment coverage',
                          metavar='File', type=argparse.FileType())
+    io_args.add_argument('-v', '--verbose', help='Describe graph', action='store_true')
 
     gr_args = parser.add_argument_group('Graph arguments')
     gr_args.add_argument('-t', '--tau', help='Hamming distance between sequences (default: %(default)s)',
@@ -223,10 +255,11 @@ def main():
     gr_args.add_argument('-r', '--resolution',
                          help='Component resolution method:\n'
                               '  edges    - remove vertices with the most edges\n'
+                              '  nedges   - remove vertices neighboring vertices with the most edges\n'
                               '  coverage - remove low covered vertices (required -c File)\n'
                               '  alleles  - remove vertices with the biggest allele numbers\n'
                               '(default: %(default)s)',
-                         choices=['edges', 'coverage', 'alleles'], default='edges')
+                         choices=['edges', 'nedges', 'coverage', 'alleles'], default='edges')
 
     other = parser.add_argument_group('Other arguments')
     other.add_argument('-h', '--help', action='help', help='Show this message and exit')
@@ -235,12 +268,15 @@ def main():
     args = parser.parse_args()
     
     graph, seqs = read_input(args.input, args.tau)
+    if args.verbose:
+        describe_graph(graph)
     if args.first_allele:
         graph.remove_first_allele_neighbours()
 
     selector = prepare_selector(args, graph.vertices)
     vertices = list(decompose_graph(graph, selector))
     write_output(vertices, seqs, args.output, args.alignment)
+    print('Removed by selector:', Graph.removed_total)
     
 
 

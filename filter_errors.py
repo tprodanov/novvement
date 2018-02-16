@@ -9,6 +9,19 @@ def load_segment_coverage(f):
     return coverages
 
 
+def filter_current(errors, range_l, range_r, keep_n):
+    res = []
+    for error in errors.split(','):
+        pos, nt = error.split(':')
+        pos = int(pos)
+        if range_l <= pos <= range_r:
+            if nt != 'N' or keep_n:
+                res.append(error)
+
+    return ','.join(res) if res else '*'
+
+
+
 def filter_errors(inp, outp, pos_range, coverages, cov_threshold, keep_n):
     import sys
 
@@ -19,14 +32,17 @@ def filter_errors(inp, outp, pos_range, coverages, cov_threshold, keep_n):
         outp.write(line)
         if not line.startswith('#'):
             break
-    
+
     for line in inp:
-        read, segment, position, alt = line.strip().split('\t')
-        position = int(position)
-        if not keep_n and alt == 'N':
+        read, segment, errors = line.strip().split('\t')
+        if coverages[segment] < cov_threshold:
             continue
-        if l <= position <= r and coverages[segment] >= cov_threshold:
-            outp.write(line)
+
+        if errors == '*':
+            outp.write('%s\t%s\t*\n' % (read, segment))
+            continue
+
+        outp.write('%s\t%s\t%s\n' % (read, segment, filter_current(errors, l, r, keep_n)))
 
 
 def main():

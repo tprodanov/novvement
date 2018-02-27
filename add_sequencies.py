@@ -21,6 +21,7 @@ def change_sequence(segment_seq, consensus):
             new_seq[pos - 1] = new_seq[pos - 1] + insert
         else:
             new_seq[pos - 1] = alt
+
     return ''.join(new_seq)
 
 

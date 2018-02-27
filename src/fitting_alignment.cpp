@@ -87,98 +87,209 @@ private:
 };
 
 
-using alignment_res = std::tuple<float, size_t, size_t>;
+using consensus_t = pair_vec<size_t, char>;
 
 
-alignment_res fitting_align(std::string const& long_seq, std::string const& short_seq,
-                            float mismatch_penalty, float indel_penalty) {
+struct alignment_args {
+    float mismatch;
+    float open_gap;
+    float extend_gap;
+};
+
+
+struct alignment_res {
+
+    alignment_res()
+        : mismatches(0)
+        , indels(0)
+    {
+        // EMPTY
+    }
+
+    size_t mismatches;
+    size_t indels;
+    consensus_t consensus;
+};
+
+
+template<typename T>
+T const& max(T const& a, T const& b, T const& c) {
+    return std::max(a, std::max(b, c));
+}
+
+
+enum Plane {
+    main_plane = 0,
+    deletions,
+    inserts
+};
+
+
+void construct_consensus(std::string const& long_seq, std::string const& short_seq,
+                         Matrix<float> const& score,
+                         Matrix<float> const& deletions,
+                         Matrix<float> const& inserts,
+                         size_t i,
+                         alignment_args const& penalties,
+                         alignment_res& result) {
+    size_t j = short_seq.size();
+
+    Plane plane = Plane::main_plane;
+    if (deletions.at(i, j) > std::max(score.at(i, j), inserts.at(i, j))) {
+        plane = Plane::deletions;
+    } else if (inserts.at(i, j) > std::max(score.at(i, j), deletions.at(i, j))) {
+        plane = Plane::inserts;
+    }
+
+    while (j > 0) {
+        if (plane == Plane::main_plane) {
+            assert(i);
+            float match = long_seq[i - 1] == short_seq[j - 1] ? 1 : penalties.mismatch;
+            if (score.at(i, j) == deletions.at(i - 1, j - 1) + match) {
+                plane = Plane::deletions;
+            } else if(score.at(i, j) == inserts.at(i - 1, j - 1) + match) {
+                plane = Plane::inserts;
+            } else {
+                assert(score.at(i, j) == score.at(i - 1, j - 1) + match);
+            }
+            if (long_seq[i - 1] != short_seq[j - 1]) {
+                result.mismatches += 1;
+                result.consensus.push_back(std::make_pair(i, short_seq[j - 1]));
+            }
+            --i;
+            --j;
+        }
+
+        else if (plane == Plane::deletions) {
+            if (deletions.at(i, j) == score.at(i - 1, j) + penalties.open_gap + penalties.extend_gap) {
+                plane = Plane::main_plane;
+            } else {
+                assert(deletions.at(i, j) == deletions.at(i - 1, j) + penalties.extend_gap);
+            }
+            result.indels += 1;
+            result.consensus.push_back(std::make_pair(i, '-'));
+            --i;
+        }
+
+        else {
+            assert(plane == Plane::inserts);
+            if (inserts.at(i, j) == score.at(i, j - 1) + penalties.open_gap + penalties.extend_gap) {
+                plane = Plane::main_plane;
+            } else {
+                assert(inserts.at(i, j) == inserts.at(i, j - 1) + penalties.extend_gap);
+            }
+            result.indels +=1;
+            result.consensus.push_back(std::make_pair(i, tolower(short_seq[j - 1])));
+            --j;
+        }
+    }
+}
+
+
+float fitting_alignment(std::string const& long_seq, std::string const& short_seq,
+                        alignment_args const& penalties,
+                        alignment_res* result = nullptr) {
     size_t n = long_seq.size();
     size_t m = short_seq.size();
     Matrix<float> score(n + 1, m + 1);
-    Matrix<size_t> indels(n + 1, m + 1);
-    Matrix<size_t> mismatches(n + 1, m + 1);
+    Matrix<float> deletions(n + 1, m + 1);
+    Matrix<float> inserts(n + 1, m + 1);
 
     for (size_t i = 0; i <= n; ++i) {
         score.at(i, 0) = 0;
-        indels.at(i, 0) = 0;
-        mismatches.at(i, 0) = 0;
+        deletions.at(i, 0) = penalties.open_gap + penalties.extend_gap;
+        inserts.at(i, 0) = penalties.open_gap + penalties.extend_gap;
     }
+
     for (size_t j = 1; j <= m; ++j) {
-        score.at(0, j) = j * indel_penalty;
-        indels.at(0, j) = j;
-        mismatches.at(0, j) = 0;
+        score.at(0, j) = penalties.open_gap + j * penalties.extend_gap;
+        deletions.at(0, j) = score.at(0, j);
+        inserts.at(0, j) = score.at(0, j);
     }
 
     for (size_t i = 1; i <= n; ++i) {
         for (size_t j = 1; j <= m; ++j) {
-            if (long_seq[i - 1] == short_seq[j - 1]) {
-                score.at(i, j) = score.at(i - 1, j - 1) + 1;
-                mismatches.at(i, j) = mismatches.at(i - 1, j - 1);
-            } else {
-                score.at(i, j) = score.at(i - 1, j - 1) + mismatch_penalty;
-                mismatches.at(i, j) = mismatches.at(i - 1, j - 1) + 1;
-            }
-            indels.at(i, j) = indels.at(i - 1, j - 1);
-
-            if (score.at(i, j) < score.at(i - 1, j) + indel_penalty) {
-                score.at(i, j) = score.at(i - 1, j) + indel_penalty;
-                mismatches.at(i, j) = mismatches.at(i - 1, j);
-                indels.at(i, j) = indels.at(i - 1, j) + 1; 
-            }
-            if (score.at(i, j) < score.at(i, j - 1) + indel_penalty) {
-                score.at(i, j) = score.at(i, j - 1) + indel_penalty;
-                mismatches.at(i, j) = mismatches.at(i, j - 1);
-                indels.at(i, j) = indels.at(i, j - 1) + 1;
-            }
+            float match = long_seq[i - 1] == short_seq[j - 1] ? 1 : penalties.mismatch;
+            score.at(i, j) = max(score.at(i - 1, j - 1),
+                                 deletions.at(i - 1, j - 1),
+                                 inserts.at(i - 1, j - 1))
+                            + match;
+            deletions.at(i, j) = std::max(score.at(i - 1, j) + penalties.open_gap,
+                                          deletions.at(i - 1, j))
+                            + penalties.extend_gap;
+            inserts.at(i, j) = std::max(score.at(i, j - 1) + penalties.open_gap,
+                                        inserts.at(i, j - 1))
+                            + penalties.extend_gap;
         }
     }
 
-    float best_score = -10000;
     size_t best_i = 0;
+    float best_score = -10000;
     for (size_t i = 0; i <= n; ++i) {
-        if (score.at(i, m) > best_score) {
-            best_score = score.at(i, m);
+        if (best_score < max(score.at(i, m),
+                             deletions.at(i, m),
+                             inserts.at(i, m))) {
+            best_score = max(score.at(i, m),
+                             deletions.at(i, m),
+                             inserts.at(i, m));
             best_i = i;
         }
     }
-    return std::make_tuple(best_score, mismatches.at(best_i, m), indels.at(best_i, m));
+
+    if (result != nullptr) {
+        construct_consensus(long_seq, short_seq,
+                            score, deletions,  inserts, best_i,
+                            penalties, *result);
+    }
+    return best_score;
 }
 
 
-std::pair<std::string, alignment_res>
-            align_to_genes(std::string const& short_seq, pair_vec<std::string> const& genes,
-                           float mismatch_penalty, float indel_penalty) {
-    alignment_res best;
-    std::string best_gene;
+std::string align_to_genes(std::string const& short_seq, pair_vec<std::string> const& genes,
+                           alignment_args const& penalties, alignment_res& result,
+                           float& score) {
+    std::pair<std::string, std::string> const* best_gene = nullptr;
+    score = -1000;
+
     for (auto const& entry : genes) {
         std::string const& gene_name = entry.first;
         std::string const& gene_seq = entry.second;
         
-        auto current = fitting_align(gene_seq, short_seq, mismatch_penalty, indel_penalty);
-        if (std::get<0>(current) > std::get<0>(best)) {
-            best = current;
-            best_gene = gene_name;
+        float current = fitting_alignment(gene_seq, short_seq, penalties, nullptr);
+        if (current > score) {
+            score = current;
+            best_gene = &entry;
         }
     }
 
-    return std::make_pair(best_gene, best);    
+    fitting_alignment(best_gene->second, short_seq, penalties, &result);
+    return best_gene->first;
 }
 
 
 void align_all(pair_vec<std::string> const& novel,
                pair_vec<std::string> const& genes,
                std::ostream& fout,
-               float mismatch_penalty,
-               float indel_penalty) {
+               alignment_args const& penalties) {
     for (auto const& entry : novel) {
-        auto res = align_to_genes(entry.second, genes, mismatch_penalty, indel_penalty);
-        std::string const& gene = res.first;
+        alignment_res result;
         float score;
-        size_t mismatches;
-        size_t indels;
-        std::tie(score, mismatches, indels) = res.second;
-
-        fout << entry.first << '\t' << gene << '\t' << score << '\t' << mismatches << '\t' << indels << '\n';
+        std::string gene = align_to_genes(entry.second, genes, penalties, result, score);
+        
+        fout << entry.first << '\t' << gene << '\t' << score
+             << '\t' << result.mismatches << '\t' << result.indels << '\t';
+        if (result.consensus.empty()) {
+            fout << '*';
+        } else {
+            for (size_t i = 0; i < result.consensus.size(); ++i) {
+                if (i) {
+                    fout << ',';
+                }
+                fout << result.consensus[i].first << ':' << result.consensus[i].second;
+            }
+        }
+        fout << '\n';
+        fout << std::flush;
     }
 }
 
@@ -188,16 +299,19 @@ int main(int argc, char *argv[]) {
     // stdin -- cropped sequences fasta, stdout -- output
     // 1 -- germline genes
     // 2 -- mismatch
-    // 3 -- indel
+    // 3 -- open_gap
+    // 4 -- extend_gap
     
     pair_vec<std::string> novel = read_fasta(std::cin);
     std::ifstream genes_f(argv[1]);
     pair_vec<std::string> genes = read_fasta(genes_f);
 
-    float mismatch = atof(argv[2]);
-    float indel = atof(argv[3]);    
+    alignment_args penalties;
+    penalties.mismatch = atof(argv[2]);
+    penalties.open_gap = atof(argv[3]);
+    penalties.extend_gap = atof(argv[4]);
 
-    align_all(novel, genes, std::cout, mismatch, indel);
+    align_all(novel, genes, std::cout, penalties);
     return 0;
 }
 

@@ -2,6 +2,8 @@
 
 
 def load_segment_coverage(f):
+    while next(f).startswith('#'):
+        pass
     coverages = {}
     for line in f:
         segment, coverage = line.strip().split()
@@ -34,15 +36,22 @@ def filter_errors(inp, outp, pos_range, coverages, cov_threshold, keep_n):
             break
 
     for line in inp:
-        read, segment, errors = line.strip().split('\t')
+        line = line.strip().split('\t')
+        read, segment, errors = line[:3]
+        remainder = line[3:]
+        if remainder:
+            remainder = '\t%s' % '\t'.join(remainder)
+        else:
+            remainder = ''
+
         if coverages[segment] < cov_threshold:
             continue
 
         if errors == '*':
-            outp.write('%s\t%s\t*\n' % (read, segment))
+            outp.write('%s\t%s\t*%s\n' % (read, segment, remainder))
             continue
 
-        outp.write('%s\t%s\t%s\n' % (read, segment, filter_current(errors, l, r, keep_n)))
+        outp.write('%s\t%s\t%s%s\n' % (read, segment, filter_current(errors, l, r, keep_n), remainder))
 
 
 def main():

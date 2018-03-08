@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 
+import sys
 from collections import Counter
 
 
@@ -55,20 +56,31 @@ def load_errors(f, labels):
             continue
         label = labels[read]
 
-        if label not in merged_reads:
-            merged_reads[label] = MergedRead(segment, label)
-        merged_reads[label].add_read(errors)
+        if (segment, label) not in merged_reads:
+            merged_reads[(segment, label)] = MergedRead(segment, label)
+        merged_reads[(segment, label)].add_read(errors)
     return merged_reads
 
 
 def write_merged_reads(merged_reads, outp):
-    import sys
     outp.write('# %s\n' % ' '.join(sys.argv))
     outp.write('read\tsegment\terrors\tlabel\n')
 
     for i, read in enumerate(merged_reads.values()):
         outp.write(read.str(i + 1))
         outp.write('\n')
+
+
+def write_segment_coverages(merged_reads, outp):
+    outp.write('# %s\n' % ' '.join(sys.argv))
+    outp.write('segment\tcoverage\n')
+
+    coverage = Counter()
+    for read in merged_reads.values():
+        coverage[read.segment] += 1
+
+    for segment, count in coverage.most_common():
+        outp.write('%s\t%d\n' % (segment, count))
 
 
 def main():
@@ -85,6 +97,8 @@ def main():
                          help='Csv file with read labels')
     io_args.add_argument('-o', '--output', metavar='File', type=argparse.FileType('w'),
                          help='Output csv file')
+    io_args.add_argument('-c', '--coverage', metavar='File', type=argparse.FileType('w'), default='/dev/null',
+                         help='Output csv file with segment coverages (default: %(default)s)')
 
     other = parser.add_argument_group('Other arguments')
     other.add_argument('-h', '--help', action='help', help='Show this message and exit')
@@ -95,6 +109,7 @@ def main():
     labels = load_labels(args.labels)
     merged_reads = load_errors(args.errors, labels)
     write_merged_reads(merged_reads, args.output)
+    write_segment_coverages(merged_reads, args.coverage)
  
 
 if __name__ == '__main__':

@@ -13,9 +13,6 @@ def create_parser():
                          required=True, metavar='File')
     io_args.add_argument('-s', '--segments', help='File with germline segments in fasta format',
                          required=True, metavar='File')
-    io_args.add_argument('-S', '--clipped-segments',
-                         help='(Optional) Already clipped germline segments in fasta format',
-                         metavar='File')
     io_args.add_argument('-o', '--output', help='Output directory',
                          required=True, metavar='Dir')
 
@@ -32,38 +29,36 @@ def create_parser():
     filt_args.add_argument('--keep-n', action='store_true',
                            help='Do not filter out mismatches with N as a substitute')
 
-    sc_args = parser.add_argument_group('Spliting reads and finding a consensus')
-    sc_args.add_argument('--peaks', type=int, metavar='Int', default=2,
-                         help='Number of peaks used in splitting (default: 2)')
-    sc_args.add_argument('--sub-cov', '--subset-coverage', dest='subset_coverage',
-                         type=int, metavar='Int', default=100,
-                         help='Minimal coverage of a reads subset (default: %(default)s)')
-    sc_args.add_argument('--spl-cov', '--split-coverage', dest='split_coverage',
-                         type=int, metavar='Int',
-                         help='Minimal coverage of subsets in splitting (default: --sub-cov / 2)')
-    sc_args.add_argument('--similarity', type=float, metavar='Float', default=0.95,
-                         help='Peaks removal threshold (default: %(default)s)')
+    div_args = parser.add_argument_group('Dividing read sets')
+    div_args.add_argument('--significance', type=float, metavar='Float', default=.001,
+                          help='Division significance (default: %(default)s')
+    div_args.add_argument('--pairs', type=int, metavar='Int', default=5,
+                          help='Maximum number of evaluated pairs of errors (default: %(default)s)')
+    div_args.add_argument('--subset-coverage', type=int, metavar='Int', default=50,
+                          help='Minimum subset size (default: %(default)s)')
             
     hl_args = parser.add_argument_group('Merging labels using Hamming graph')
     hl_args.add_argument('--labels-tau', metavar='Int', type=int, default=3,
                          help='Hamming distance between labels (cdr3s) (default: %(default)s)')
 
+    fit_args = parser.add_argument_group('Fitting alignment arguments')
+    fit_args.add_argument('--mismatch', type=float, metavar='Float', default=-1,
+                          help='Mismatch penalty (default: %(default)s)')
+    fit_args.add_argument('--open-gap', type=float, metavar='Float', default=-4,
+                          help='Penalty for opening a gap (default: %(default)s)')
+    fit_args.add_argument('--extend-gap', type=float, metavar='Float', default=-1,
+                          help='Penalty for extending a gap (default: %(default)s)')
+
     f2_args = parser.add_argument_group('Filtering novel segments')
-    f2_args.add_argument('--min-dist', metavar='Int', type=int, default=2,
-                         help='Minimal Hamming distance to clipped segments (default: %(default)s)')
+    f2_args.add_argument('--differences', metavar='Int', type=int, default=2,
+                         help='Minimal required number of mismatches + indels (default: %(default)s)')
+    f2_args.add_argument('--indels-enough', metavar='Int', type=int, default=1,
+                         help='Number of indels sufficient for selecting a novel segment (default: %(default)s)')
+    f2_args.add_argument('--novel-coverage', metavar='Int', type=int, default=0,
+                         help='Minimal coverage of a novel segment (default: same as --subset-coverage)')
+    f2_args.add_argument('--novel-labels', metavar='Int', type=int, default=0,
+                         help='Minimal number of labels (default: %(default)s')
     
-    hs_args = parser.add_argument_group('Merging sequences using Hamming graph')
-    hs_args.add_argument('--seqs-tau', metavar='Int', type=int, default=1,
-                         help='Hamming distance between sequences (default: %(default)s)')
-    hs_args.add_argument('--seqs-same-lengths', action='store_true',
-                         help='Forbid edges between sequences with different sizes')
-
-    sign_args = parser.add_argument_group('Significance arguments')
-    sign_args.add_argument('--label-cov', '--label-coverage', dest='label_coverage',
-                           type=int, metavar='Int', default=5,
-                           help='Minimum label coverage to contribute in significance\n'
-                           '(default: %(default)s)')
-
     other = parser.add_argument_group('Other arguments')
     other.add_argument('-h', '--help', action='help', help='Show this message and exit')
     other.add_argument('-V', '--version', action='version', help='Show version', version=__version__)
@@ -75,8 +70,8 @@ def main():
 
     parser = create_parser()
     args = parser.parse_args()
-    if args.split_coverage is None:
-        args.split_coverage = args.subset_coverage // 2
+
+    args.keep_empty = args.differences * args.indels_enough == 0
     
     args.script_dir = os.path.abspath(os.path.dirname(__file__))
     snakefile = os.path.join(args.script_dir, 'Snakefile')

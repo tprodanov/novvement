@@ -176,7 +176,7 @@ def main():
     from extra._version import __version__
     import sys
 
-    parser = argparse.ArgumentParser(description='!!!!!!!!!!!!!!!!!!!!!!!',
+    parser = argparse.ArgumentParser(description='Divide read sets into subsets',
                                      formatter_class=argparse.RawTextHelpFormatter, add_help=False,
                                      usage='-i File -r File -s File [args]')
     io_args = parser.add_argument_group('Input/output arguments')
@@ -192,7 +192,7 @@ def main():
                           help='Division significance (default: %(default)s)')
     div_args.add_argument('-p', '--pairs', type=int, metavar='Int', default=5,
                           help='Maximum number of evaluated pairs of errors (default: %(default)s)')
-    div_args.add_argument('-c', '--coverage', type=int, metavar='Int', default=30,
+    div_args.add_argument('-c', '--coverage', type=int, metavar='Int', default=50,
                           help='Minimum subset size (default: %(default)s)')
 
     other = parser.add_argument_group('Other arguments')

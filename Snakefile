@@ -20,7 +20,7 @@ import os
 
 rule all:
     input:
-        expand('{outp}/data/merged.csv', outp=OUTP)
+        expand('{outp}/data/{name}/summary.csv', outp=OUTP, name=NAMES)
     threads: config['threads']
 
 
@@ -59,21 +59,36 @@ rule alignment_errors:
         '%s/alignment_errors.py -i {input} -o {output}' % DIR
 
 
-rule segment_coverage:
+rule hamming_labels:
     input:
-        '%s/data/{name}/alignment.fa' % OUTP
+        bin=os.path.abspath('%s/bin/hamming' % DIR),
+        f='%s/data/{name}/cdrs.fa' % OUTP
     output:
-        '%s/data/{name}/segment_coverage.csv' % OUTP
+        '%s/data/{name}/labels.csv' % OUTP
     message:
-        'Calculating segment coverage: {wildcards.name}'
+        'Merging read labels using Hamming graph: {wildcards.name}'
     shell:
-        r"cat {input} | sed -n '3~4p' | sed 's/.*GENE:\([^|]*\)|.*/\1/' | sort | uniq -c "
-        r"| awk '{{t = $1; $1 = $2; $2 = t; print}}' > {output}"
+        r"cat {{input.f}} | sed 's/^>\(.*\)$/>\1\t/' | tr -d '\n' | tr '>' '\n' | " \
+        '{dir}/hamming_labels.py -i - -o {{output}} --tau {tau};\n' \
+        r"sed -i '3~1s/\t/\t{{wildcards.name}}_/' {{output}}".format(dir=DIR, tau=config['labels_tau'])
+
+
+rule merge_reads:
+    input:
+        errors='%s/data/{name}/errors.csv' % OUTP,
+        labels='%s/data/{name}/labels.csv' % OUTP
+    output:
+        merged='%s/data/{name}/merged.csv' % OUTP,
+        coverage='%s/data/{name}/segment_coverage.csv' % OUTP
+    message:
+        'Merging reads: {wildcards.name}'
+    shell:
+        '%s/merge_reads.py -e {input.errors} -l {input.labels} -o {output.merged} -c {output.coverage}' % DIR
 
 
 rule filter_errors:
     input:
-        errors='%s/data/{name}/errors.csv' % OUTP,
+        errors='%s/data/{name}/merged.csv' % OUTP,
         coverage='%s/data/{name}/segment_coverage.csv' % OUTP
     output:
         '%s/data/{name}/filtered.csv' % OUTP
@@ -97,90 +112,63 @@ rule compile:
         'g++ {input} -std=c++1y -O3 -o {output}'
 
 
-rule hamming_labels:
+rule divide_reads:
     input:
-        bin=os.path.abspath('%s/bin/hamming' % DIR),
-        f='%s/data/{name}/cdrs.fa' % OUTP
+        '%s/data/{name}/filtered.csv' % OUTP
     output:
-        '%s/data/{name}/labels.csv' % OUTP
+        reads='%s/data/{name}/subset_reads.csv' % OUTP,
+        summary='%s/data/{name}/subset_summary.csv' % OUTP
     message:
-        'Merging read labels using Hamming graph: {wildcards.name}'
+        'Dividing read sets: {wildcards.name}'
     shell:
-        r"cat {{input.f}} | sed 's/^>\(.*\)$/>\1\t/' | tr -d '\n' | tr '>' '\n' | " \
-        '{dir}/hamming_labels.py -i - -o {{output}} --tau {tau};\n' \
-        r"sed -i '3~1s/\t/\t{{wildcards.name}}_/' {{output}}".format(dir=DIR, tau=config['labels_tau'])
-    
+        '{dir}/divide_reads.py -i {{input}} -r {{output.reads}} -s {{output.summary}} ' \
+        '-S {significance} -p {pairs} -c {coverage}' \
+            .format(dir=DIR, significance=config['significance'], pairs=config['pairs'],
+                    coverage=config['subset_coverage'])
 
-rule combine_errors:
+
+rule add_sequences:
     input:
-        filtered='%s/data/{name}/filtered.csv' % OUTP,
-        labels='%s/data/{name}/labels.csv' % OUTP,
-        segments=config['segments']
+        summary='%s/data/{name}/subset_summary.csv' % OUTP,
+        germline=config['segments']
     output:
-        '%s/data/{name}/combined.csv' % OUTP
+        full='%s/data/{name}/full.fa' % OUTP,
+        cropped='%s/data/{name}/cropped.fa' % OUTP
     message:
-        'Combine errors: {wildcards.name}'
+        'Converting subsets into fasta: {wildcards.name}'
     shell:
-        '{dir}/combine_errors.py -f {{input.filtered}} -l {{input.labels}} '
-        '-s {{input.segments}} -o {{output}} --peaks {peaks} '
-        '--coverage {coverage} --spl-coverage {spl_coverage} --similarity {similarity}' \
-            .format(dir=DIR, coverage=config['subset_coverage'], peaks=config['peaks'],
-                    spl_coverage=config['split_coverage'], similarity=config['similarity'])
+        '{dir}/add_sequences.py -i {{input.summary}} -s {{input.germline}} -o {{output.full}} {{output.cropped}} ' \
+        '-r {range[0]} {range[1]}{keep_empty} -c {coverage} -l {labels}' \
+            .format(dir=DIR, range=config['range'], keep_empty=' --keep-empty' if config['keep_empty'] else '',
+                    coverage=config['novel_coverage'], labels=config['novel_labels'])
 
 
-rule clip_and_filter:
+rule fitting_alignment:
     input:
-        bin=os.path.abspath('%s/bin/clip_and_filter' % DIR),
-        combined='%s/data/{name}/combined.csv' % OUTP,
-        segments=config['segments'] if config['clipped_segments'] is None else config['clipped_segments']
+        cropped='%s/data/{name}/cropped.fa' % OUTP,
+        germline=config['segments']
     output:
-        '%s/data/{name}/clipped_filtered.csv' % OUTP
+        '%s/data/{name}/fit.csv' % OUTP
     message:
-        'Clip and filter sequences: {wildcards.name}'
+        'Performing fitting alignment on read subsets: {wildcards.name}'
     shell:
-        'tail -n+3 {{input.combined}} | cut -f4 | ' \
-        '{dir}/clip_and_filter.py -s - -S {{input.segments}} -o {{output}} ' \
-        '--range {range[0]} {range[1]} --min-dist {min_dist}{no_clipping}' \
-                .format(dir=DIR,
-                        range=config['range'],
-                        min_dist=config['min_dist'],
-                        no_clipping='' if config['clipped_segments'] is None else ' --no-clipping')
+        '{dir}/fitting_alignment.py -i {{input.cropped}} -s {{input.germline}} -o {{output}} ' \
+        '-M {mismatch} -O {open_gap} -E {extend_gap}' \
+            .format(dir=DIR, mismatch=config['mismatch'], open_gap=config['open_gap'], extend_gap=config['extend_gap'])
 
 
-rule concat_sequences:
+rule summarize:
     input:
-        expand('{outp}/data/{name}/clipped_filtered.csv', outp=OUTP, name=NAMES)
+        subsets='%s/data/{name}/subset_summary.csv' % OUTP,
+        fit='%s/data/{name}/fit.csv' % OUTP,
+        full='%s/data/{name}/full.fa' % OUTP,
+        cropped='%s/data/{name}/cropped.fa' % OUTP
     output:
-        '%s/data/concat.csv' % OUTP
-    shell:
-        'echo "seq\tlabel" > {output}\n' \
-        'for f in {input}; do tail -n+3 $f >> {output}; done'
-
-
-rule hamming_sequences:
-    input:
-        bin=os.path.abspath('%s/bin/hamming' % DIR),
-        f='%s/data/concat.csv' % OUTP
-    output:
-        '%s/data/components.csv' % OUTP
+        '%s/data/{name}/summary.csv' % OUTP
     message:
-        'Merging sequences using Hamming graph'
+        'Summarizing {wildcards.name}'
     shell:
-        '{dir}/hamming_labels.py -i {{input.f}} -o {{output}} --tau {tau}{diff_lengths}' \
-            .format(dir=DIR, tau=config['seqs_tau'],
-                    diff_lengths='' if config['seqs_same_lengths'] else ' --accept-diff-lengths')
-
-
-rule merge_and_sort:
-    input:
-        combined=expand('{outp}/data/{name}/combined.csv', outp=OUTP, name=NAMES),
-        components='%s/data/components.csv' % OUTP
-    output:
-        '%s/data/merged.csv' % OUTP,
-        '%s/data/merged_full.csv' % OUTP
-    message:
-        'Merging novel sequences and sorting them'
-    shell:
-        '{dir}/merge_and_sort.py -i {{input.combined}} -c {{input.components}} -o {{output}} --min-coverage {min_coverage}' \
-            .format(dir=DIR, min_coverage=config['label_coverage'])
+        '{dir}/summarize.py -s {{input.subsets}} -f {{input.fit}} -S {{input.full}} {{input.cropped}} ' \
+        '-o {{output}} -D {differences} -I {indels_enough}' \
+            .format(dir=DIR, differences=config['differences'], indels_enough=config['indels_enough'])
 

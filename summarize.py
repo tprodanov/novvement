@@ -56,7 +56,7 @@ class SubsetSummary:
         self.labels = int(self.labels)
 
 
-def process_fit(f, summaries, full_seqs, cropped_seqs, outp, *, mutations, indels_enough):
+def process_fit(f, summaries, full_seqs, cropped_seqs, outp, *, differences, indels_enough):
     import sys
     outp.write('# %s\n' % ' '.join(sys.argv))
     outp.write('subset\tsegment\tcoverage\tlabels\tscore\tmismatches\tindels\tconsensus\tfull_seq\tcropped_seq\n')
@@ -65,7 +65,7 @@ def process_fit(f, summaries, full_seqs, cropped_seqs, outp, *, mutations, indel
         pass
     for line in f:
         fit = FitResult(line)
-        if fit.indels < indels_enough and fit.indels + fit.mismatches < mutations:
+        if fit.indels < indels_enough and fit.indels + fit.mismatches < differences:
             continue
 
         summary = summaries[fit.subset]
@@ -94,7 +94,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='Create summary over novel segments',
                                      formatter_class=argparse.RawTextHelpFormatter, add_help=False,
-                                     usage='%(prog)s -s File -f File -S File File -o File')
+                                     usage='%(prog)s -s File -f File -S File File -o File [args]')
     io_args = parser.add_argument_group('Input/output arguments')
     io_args.add_argument('-s', '--subsets', type=argparse.FileType(), metavar='File',
                          help='Input csv file with summary over subsets')
@@ -106,7 +106,7 @@ def main():
                          help='Output csv file')
 
     filt_args = parser.add_argument_group('Filtering arguments')
-    filt_args.add_argument('-M', '--mutations', type=int, metavar='Int', default=2,
+    filt_args.add_argument('-D', '--differences', type=int, metavar='Int', default=2,
                            help='Minimal required number of mismatches + indels (default: %(default)s)')
     filt_args.add_argument('-I', '--indels-enough', type=int, metavar='Int', default=1,
                            help='Number of indels enough for selecting a subset (default: %(default)s)')
@@ -121,7 +121,7 @@ def main():
     cropped_seqs = load_sequences(args.sequences[1])
     summaries = load_summaries(args.subsets)
     process_fit(args.fit, summaries, full_seqs, cropped_seqs, args.output,
-                mutations=args.mutations, indels_enough=args.indels_enough)
+                differences=args.differences, indels_enough=args.indels_enough)
  
 
 if __name__ == '__main__':

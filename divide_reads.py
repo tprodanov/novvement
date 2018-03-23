@@ -125,7 +125,7 @@ class ReadsSubset:
     def labels(self):
         lengths = set()
         for read in self.reads:
-            lengths.add(len(read.label.split('_')[1]))
+            lengths.add(len(read.label))
         return len(lengths)
 
     def write(self, index, read_outp, summary_outp):

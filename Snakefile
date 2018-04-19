@@ -5,7 +5,7 @@ def load_datasets():
     dat_dir = os.path.dirname(dataset)
 
     with open(dataset) as f:
-        datasets = [line.strip().split() for line in f if not line.startswith('#')]
+        datasets = [line.strip().split() for line in f if not line.startswith('#') if not line.startswith('!')]
         names = [item[0] for item in datasets]
         alignment = [os.path.abspath(os.path.join(dat_dir, item[1])) for item in datasets]
         cdrs = [os.path.abspath(os.path.join(dat_dir, item[2])) for item in datasets]
@@ -20,7 +20,7 @@ import os
 
 rule all:
     input:
-        expand('{outp}/data/{name}/summary.csv', outp=OUTP, name=NAMES)
+        '%s/found.csv' % OUTP
     threads: config['threads']
 
 
@@ -138,9 +138,8 @@ rule add_sequences:
         'Converting subsets into fasta: {wildcards.name}'
     shell:
         '{dir}/add_sequences.py -i {{input.summary}} -s {{input.germline}} -o {{output.full}} {{output.cropped}} ' \
-        '-r {range[0]} {range[1]}{keep_empty} -c {coverage} -l {labels}' \
-            .format(dir=DIR, range=config['range'], keep_empty=' --keep-empty' if config['keep_empty'] else '',
-                    coverage=config['novel_coverage'], labels=config['novel_labels'])
+        '-r {range[0]} {range[1]} --keep-empty -c 0 -l 0' \
+            .format(dir=DIR, range=config['range'])
 
 
 rule fitting_alignment:
@@ -169,6 +168,22 @@ rule summarize:
         'Summarizing {wildcards.name}'
     shell:
         '{dir}/summarize.py -s {{input.subsets}} -f {{input.fit}} -S {{input.full}} {{input.cropped}} ' \
-        '-o {{output}} -D {differences} -I {indels_enough}' \
-            .format(dir=DIR, differences=config['differences'], indels_enough=config['indels_enough'])
+        '-o {{output}} -D 0 -I 0' \
+            .format(dir=DIR)
+
+rule combine_and_classify:
+    input:
+        summaries=expand('{outp}/data/{name}/summary.csv', outp=OUTP, name=NAMES),
+        datasets=config['input']
+    output:
+        success='%s/found.csv' % OUTP,
+        fail='%s/discarded.csv' % OUTP
+    message:
+        'Combining summaries and classifying putative segments'
+    shell:
+        '{dir}/combine_and_classify.py -i {{input.summaries}} -d {{input.datasets}} ' \
+        '-o {{output.success}} {{output.fail}} {plots} --prob {prob} {isoclines}' \
+            .format(dir=DIR, plots='' if config['skip_plots'] else '-p %s/plots' % OUTP,
+                    prob=config['prob'],
+                    isoclines='' if config['skip_plots'] else '--isoclines %s' % ' '.join(map(str, config['isoclines'])))
 

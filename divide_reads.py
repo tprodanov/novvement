@@ -178,7 +178,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='Divide read sets into subsets',
                                      formatter_class=argparse.RawTextHelpFormatter, add_help=False,
-                                     usage='-i File -r File -s File [args]')
+                                     usage='%(prog)s -i File -r File -s File [args]')
     io_args = parser.add_argument_group('Input/output arguments')
     io_args.add_argument('-i', '--input', type=argparse.FileType(), metavar='File',
                          help='Csv file with reads merged by label')

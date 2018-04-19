@@ -89,7 +89,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='Merge reads with the same CDR3 labels',
                                      formatter_class=argparse.RawTextHelpFormatter, add_help=False,
-                                     usage='-e File -l File -o File')
+                                     usage='%(prog)s -e File -l File -o File')
     io_args = parser.add_argument_group('Input/output arguments')
     io_args.add_argument('-e', '--errors', metavar='File', type=argparse.FileType(),
                          help='Csv file with errors')

@@ -114,7 +114,8 @@ rule compile:
 
 rule divide_reads:
     input:
-        '%s/data/{name}/filtered.csv' % OUTP
+        filtered='%s/data/{name}/filtered.csv' % OUTP,
+        bin='$s/bin/divide_reads' % DIR 
     output:
         reads='%s/data/{name}/subset_reads.csv' % OUTP,
         summary='%s/data/{name}/subset_summary.csv' % OUTP

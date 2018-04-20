@@ -122,7 +122,7 @@ rule divide_reads:
     message:
         'Dividing read sets: {wildcards.name}'
     shell:
-        '{dir}/divide_reads.py -i {{input}} -r {{output.reads}} -s {{output.summary}} ' \
+        '{dir}/divide_reads.py -i {{input.filtered}} -r {{output.reads}} -s {{output.summary}} ' \
         '-S {significance} -p {pairs} -c {coverage}' \
             .format(dir=DIR, significance=config['significance'], pairs=config['pairs'],
                     coverage=config['subset_coverage'])

@@ -3,6 +3,11 @@
 import sklearn.linear_model
 import math
 import numpy as np
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+except ImportError:
+    pass
 
 
 class Segment:

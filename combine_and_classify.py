@@ -3,6 +3,7 @@
 import sklearn.linear_model
 import math
 import numpy as np
+import re
 try:
     import matplotlib
     matplotlib.use('Agg')
@@ -45,6 +46,7 @@ class Group:
 
     def __init__(self, name):
         self.name = name
+        self.writtable_name = re.sub(r'\s', '_', self.name)
         self.segments = []
         self.probabilities = None
         self.lr = sklearn.linear_model.LogisticRegression(penalty='l2', C=100)
@@ -129,7 +131,7 @@ def write_outp(groups, thr_prob, outp_success, outp_fail):
     res = []
     for group in groups:
         for segm, prob in group.get_segm_prob():
-            res.append((prob, group.name, segm))
+            res.append((prob, group.writtable_name, segm))
     res.sort(reverse=True, key=lambda x: (x[0], x[2].fitness()))
 
     for outp in [outp_success, outp_fail]:

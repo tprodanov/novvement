@@ -35,7 +35,7 @@ def reformat_consensus(consensus):
             result.append((pos, alt))
 
     for pos, alt in inserts.items():
-        resutl.append((pos, ''.join(alt).upper()))
+        result.append((pos, ''.join(alt).upper()))
     result.sort()
     return ','.join('%d:%s' % item for item in result)
 

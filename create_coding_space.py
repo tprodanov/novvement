@@ -276,8 +276,7 @@ def main():
     selector = prepare_selector(args, graph.vertices)
     vertices = list(decompose_graph(graph, selector))
     write_output(vertices, seqs, args.output, args.alignment)
-    print('Removed by selector:', Graph.removed_total)
-    
+    print('Removed by selector:', Graph.removed_total) 
 
 
 if __name__ == '__main__':

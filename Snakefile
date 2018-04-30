@@ -146,7 +146,8 @@ rule add_sequences:
 rule fitting_alignment:
     input:
         cropped='%s/data/{name}/cropped.fa' % OUTP,
-        germline=config['segments']
+        germline=config['segments'],
+        bin='%s/bin/fitting_alignment' % DIR
     output:
         '%s/data/{name}/fit.csv' % OUTP
     message:

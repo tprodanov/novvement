@@ -296,11 +296,11 @@ struct reads_subset {
 
     void write(size_t index, std::ostream& reads_outp, std::ostream& summary_outp) const {
         char name[50];
-        sprintf(name, "%s:%d", segment_.c_str(), index);
+        sprintf(name, "%s:%zd", segment_.c_str(), index);
 
         size_t labels = different_labels();
         char long_name[100];
-        sprintf(long_name, "\"%s:%2d. Coverage: %d. Labels: %d\"", segment_.c_str(), index, reads_.size(), labels);
+        sprintf(long_name, "\"%s:%2zd. Coverage: %zd. Labels: %zd\"", segment_.c_str(), index, reads_.size(), labels);
 
         for (read const& r : reads_) {
             r.write_to(reads_outp, segment_, long_name);

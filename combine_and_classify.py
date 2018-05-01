@@ -4,6 +4,7 @@ import sklearn.linear_model
 import math
 import numpy as np
 import re
+import random
 try:
     import matplotlib
     matplotlib.use('Agg')
@@ -32,7 +33,7 @@ class Segment:
         return self.coverage + self.labels
 
     def to_str(self, prob):
-        return '{dataset}\t{segment}\t{prob}\t{coverage}\t{labels}\t{mismatches}\t{indels}\t{consensus}\t' \
+        return '{dataset}\t{segment}\t{prob:.4f}\t{coverage}\t{labels}\t{mismatches}\t{indels}\t{consensus}\t' \
                '{full}\t{cropped}'.format(dataset=self.dataset, segment=self.segment, prob=prob,
                     coverage=self.coverage, labels=self.labels, mismatches=self.mismatches, indels=self.indels,
                     consensus=self.consensus, full=self.full_seq, cropped=self.cropped_seq)
@@ -68,9 +69,10 @@ class Group:
     def add_isoclines(self, prob, isoclines, transformed):
         import matplotlib.pyplot as plt
         if transformed: # If the plot is transformed - isoclines are not
-            x_fun = x_revfun = y_revfun = lambda x: x
+            x_fun = x_revfun = y_revfun = y_fun = lambda x: x
         else:
             x_fun = Group.coverage_fun
+            y_fun = Group.labels_fun
             x_revfun = Group.coverage_revfun
             y_revfun = Group.labels_revfun
 
@@ -82,9 +84,9 @@ class Group:
 
             iso_y = y_revfun(-(interc + coeffs[0] * x_fun(iso_x)) / coeffs[1])
             plt.plot(iso_x, iso_y, alpha=1 if p == prob else .4, linewidth=1, c='k') #, label=str(p))
-            i_s = [i for i, y in enumerate(iso_y) if axes[2] < y < axes[3]]
-            i = i_s[3 * len(i_s) // 4]
-            plt.text(iso_x[i], iso_y[i], str(p), fontsize=8, alpha=.5)
+            y_text = axes[2] + .1 * random.random() * (axes[3] - axes[2])
+            x_text = x_revfun(-(interc + coeffs[1] * y_fun(y_text)) / coeffs[0])
+            plt.text(x_text, y_text, str(p), fontsize=8, alpha=.5)
 
     def draw(self, outp_name, prob, isoclines, transformed=False):
         import matplotlib.pyplot as plt

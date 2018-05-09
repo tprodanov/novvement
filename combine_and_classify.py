@@ -126,6 +126,14 @@ class Group:
         plt.ylabel(fmt_y % 'CDR3s')
         plt.savefig(outp_name, dpi=500)
 
+    def print_coefficients(self):
+        print('%s  intercept   coverage     labels' % self.name)
+        print(' ' * len(self.name), end='  ')
+        print('%9.4f' % self.lr.intercept_[0], end='  ')
+        print('%9.4f' % self.lr.coef_[0][0], end='  ')
+        print('%9.4f' % self.lr.coef_[0][1])
+        print()
+
 
 def write_outp(groups, thr_prob, outp_success, outp_fail):
     import sys
@@ -211,6 +219,7 @@ def main():
     cl_args = parser.add_argument_group('Classification arguments')
     cl_args.add_argument('--prob', metavar='Float', type=float, default=.8,
                          help='Minimal logistic regression probability (default: %(default)s)')
+    cl_args.add_argument('--verbose', action='store_true', help='Print classification coefficients')
 
     dr_args = parser.add_argument_group('Drawing arguments')
     dr_args.add_argument('--isoclines', nargs='*', type=float, metavar='Float',
@@ -229,6 +238,10 @@ def main():
     write_outp(groups, args.prob, *args.output)
     if args.plots:
         draw_plots(groups, args.plots, args.prob, args.isoclines)
+
+    if args.verbose:
+        for group in groups:
+            group.print_coefficients()
 
 
 if __name__ == '__main__':

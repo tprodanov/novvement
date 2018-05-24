@@ -53,8 +53,8 @@ def create_parser():
                           help='Penalty for extending a gap (default: %(default)s)')
 
     cl_args = parser.add_argument_group('Classifying putative novel segments')
-    cl_args.add_argument('--threshold', metavar='Float', type=float, default=10,
-                         help='Minimal distance to the break point (default: %(default)s)')
+    cl_args.add_argument('--threshold', metavar='Float', type=float, default=0.05,
+                         help='Maximal p-value (default: %(default)s)')
 
     dr_args = parser.add_argument_group('Drawing arguments')
     dr_args.add_argument('--skip-plots', action='store_true',

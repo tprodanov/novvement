@@ -26,10 +26,13 @@ def change_sequence(segment_seq, consensus):
 
 
 def process_line(segments, line, keep_empty, min_coverage, min_labels):
-    subset, coverage, labels, consensus = line.strip().split('\t')
+    subset, coverage, coverage_rate, labels, consensus = line.strip().split('\t')
     segment = subset.split(':')[0]
     coverage = int(coverage)
+    coverage_rate = float(coverage_rate)
     labels = int(labels)
+    if segment not in segments:
+        return
     if not keep_empty and consensus == '*':
         return
     if coverage < min_coverage:

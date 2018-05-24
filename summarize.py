@@ -51,15 +51,16 @@ class FitResult:
 
 class SubsetSummary:
     def __init__(self, line):
-        self.subset, self.coverage, self.labels, self.consensus = line.strip().split('\t')
-        self.coverage = int(self.coverage)
-        self.labels = int(self.labels)
+        self.subset, coverage, coverage_rate, labels, self.consensus = line.strip().split('\t')
+        self.coverage = int(coverage)
+        self.coverage_rate = float(coverage_rate)
+        self.labels = int(labels)
 
 
 def process_fit(f, summaries, full_seqs, cropped_seqs, outp, *, differences, indels_enough):
     import sys
     outp.write('# %s\n' % ' '.join(sys.argv))
-    outp.write('subset\tsegment\tcoverage\tlabels\tscore\tmismatches\tindels\tconsensus\tfull_seq\tcropped_seq\n')
+    outp.write('subset\tsegment\tcoverage\tcoverage_rate\tlabels\tscore\tmismatches\tindels\tconsensus\tfull_seq\tcropped_seq\n')
 
     while next(f).startswith('#'):
         pass
@@ -69,10 +70,10 @@ def process_fit(f, summaries, full_seqs, cropped_seqs, outp, *, differences, ind
             continue
 
         summary = summaries[fit.subset]
-        outp.write('{subset}\t{segment}\t{coverage}\t{labels}\t{score:.1f}\t{mismatches}\t{indels}\t{consensus}\t'
-                   '{full_seq}\t{cropped_seq}\n'
-                   .format(subset=fit.subset, segment=fit.segment, coverage=summary.coverage, labels=summary.labels,
-                           score=fit.score, mismatches=fit.mismatches, indels=fit.indels,
+        outp.write('{subset}\t{segment}\t{coverage}\t{coverage_rate}\t{labels}\t{score:.1f}\t{mismatches}\t{indels}\t'
+                   '{consensus}\t{full_seq}\t{cropped_seq}\n'
+                   .format(subset=fit.subset, segment=fit.segment, coverage=summary.coverage, coverage_rate=summary.coverage_rate,
+                           labels=summary.labels, score=fit.score, mismatches=fit.mismatches, indels=fit.indels,
                            consensus=fit.consensus, full_seq=full_seqs[fit.subset], cropped_seq=cropped_seqs[fit.subset]))
 
 

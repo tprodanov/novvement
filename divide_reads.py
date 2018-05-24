@@ -37,7 +37,7 @@ def main():
     args.reads.write('read\tsegment\terrors\tlabel\tsubset\n')
     args.reads.flush()
     args.summary.write('# %s\n' % ' '.join(sys.argv))
-    args.summary.write('subset\tcoverage\tlabels\tconsensus\n')
+    args.summary.write('subset\tcoverage\tcoverage_rate\tlabels\tconsensus\n')
     args.summary.flush()
     current_dir = os.path.dirname(__file__)
 

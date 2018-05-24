@@ -98,7 +98,7 @@ rule filter_errors:
         '{dir}/filter_errors.py -e {{input.errors}} -c {{input.coverage}} -o {{output}} ' \
         '--range {range[0]} {range[1]} --threshold {threshold}{keep_n}'.format(dir=DIR,
                                                                        range=config['range'],
-                                                                       threshold=config['segment_coverage'],
+                                                                       threshold=config['subset_coverage'],
                                                                        keep_n=' --keep-n' if config['keep_n'] else '')
 
 rule compile:
@@ -184,8 +184,6 @@ rule combine_and_classify:
         'Combining summaries and classifying putative segments'
     shell:
         '{dir}/combine_and_classify.py -i {{input.summaries}} -d {{input.datasets}} ' \
-        '-o {{output.success}} {{output.fail}} {plots} --prob {prob} {isoclines}' \
-            .format(dir=DIR, plots='' if config['skip_plots'] else '-p %s/plots' % OUTP,
-                    prob=config['prob'],
-                    isoclines='' if config['skip_plots'] else '--isoclines %s' % ' '.join(map(str, config['isoclines'])))
+        '-o {{output.success}} {{output.fail}} {plots} --threshold {threshold}' \
+            .format(dir=DIR, plots='' if config['skip_plots'] else '-p %s/plots' % OUTP, threshold=config['threshold'])
 

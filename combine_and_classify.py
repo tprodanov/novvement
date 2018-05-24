@@ -11,6 +11,9 @@ try:
 except ImportError:
     pass
 
+import sklearn.linear_model
+import sklearn.metrics
+
 
 class Segment:
     def __init__(self, dataset, line):
@@ -18,33 +21,64 @@ class Segment:
         self.dataset = dataset
         self.segment = line[1]
         self.coverage = int(line[2])
-        self.labels = int(line[3])
-        self.mismatches = int(line[5])
-        self.indels = int(line[6])
-        self.consensus = line[7]
-        self.full_seq = line[8]
-        self.cropped_seq = line[9]
+        self.coverage_rate = float(line[3])
+        self.labels = int(line[4])
+        self.mismatches = int(line[6])
+        self.indels = int(line[7])
+        self.consensus = line[8]
+        self.full_seq = line[9]
+        self.cropped_seq = line[10]
 
     def known(self):
         assert (self.mismatches + self.indels == 0) == (self.consensus == '*')
         return self.consensus == '*'
 
     def fitness(self):
-        return self.coverage + self.labels
+        return self.coverage_rate, self.labels
 
-    def to_str(self, prob):
-        return '{dataset}\t{segment}\t{prob:.4f}\t{coverage}\t{labels}\t{mismatches}\t{indels}\t{consensus}\t' \
-               '{full}\t{cropped}'.format(dataset=self.dataset, segment=self.segment, prob=prob,
-                    coverage=self.coverage, labels=self.labels, mismatches=self.mismatches, indels=self.indels,
-                    consensus=self.consensus, full=self.full_seq, cropped=self.cropped_seq)
+    def to_str(self, dist_to_break):
+        return '{dataset}\t{segment}\t{dist_to_break:.1f}\t{coverage}\t{coverage_rate}\t{labels}\t{mismatches}\t' \
+               '{indels}\t{consensus}\t{full}\t{cropped}'.format(dataset=self.dataset, segment=self.segment,
+                       dist_to_break=dist_to_break, coverage=self.coverage, coverage_rate=self.coverage_rate,
+                       labels=self.labels, mismatches=self.mismatches, indels=self.indels,
+                       consensus=self.consensus, full=self.full_seq, cropped=self.cropped_seq)
+
+
+def count_elements_to_left(projections, coef, interc):
+    x_min = min(projections)
+    x_max = max(projections)
+
+    total = len(projections)
+
+    res = []
+    for i in range(101):
+        res.append(1 - sum(projections <= x_min + (x_max - x_min) * i / 100) / total)
+    return res
+
+
+def lr_squared_error(curve, i=0, j=None):
+    if j is None:
+        j = len(curve)
+    x = np.matrix(list(range(i, j))).T
+    y = np.array(curve[i:j])
+
+    lr = sklearn.linear_model.LinearRegression().fit(x, y)
+    pred = lr.predict(x)
+    return (j - i) * sklearn.metrics.mean_squared_error(pred, y)
+
+
+def break_curve(curve):
+    m = float('inf')
+    best_i = 0
+    for i in range(1, len(curve) - 1):
+        curr = lr_squared_error(curve, 0, i) + lr_squared_error(curve, i)
+        if curr < m:
+            m = curr
+            best_i = i
+    return best_i, m
 
 
 class Group:
-    coverage_fun = np.log
-    coverage_revfun = np.exp
-    labels_fun = np.log
-    labels_revfun = np.exp
-
     def __init__(self, name):
         self.name = name
         self.writtable_name = re.sub(r'\s', '_', self.name)
@@ -55,55 +89,62 @@ class Group:
     def add_segment(self, segment):
         self.segments.append(segment)
 
+    def regression_coefficients(self):
+        x = np.log(np.matrix([segm.coverage_rate for segm in self.segments]).T)
+        y = np.log([segm.labels for segm in self.segments])
+        lr = sklearn.linear_model.LinearRegression()
+        lr.fit(x, y)
+        return lr.coef_[0], lr.intercept_
+
+    def project(self, coef, interc):
+        x = np.log([segm.coverage_rate for segm in self.segments])
+        y = np.log([segm.labels for segm in self.segments])
+        return (y + x / coef - interc) / (coef + 1 / coef)
+
     def classify(self):
-        X = [[Group.coverage_fun(segm.coverage), Group.labels_fun(segm.labels)] for segm in self.segments]
-        y = [int(segm.known()) for segm in self.segments]
-        self.lr.fit(X, y)
-        self.probabilities = self.lr.predict_proba(X)
+        self.coef, self.interc = self.regression_coefficients()
+        projections = self.project(self.coef, self.interc)
+        unknown_projections = np.array([x for x, segm in zip(projections, self.segments) if not segm.known()])
+        curve = count_elements_to_left(unknown_projections, self.coef, self.interc)
+        break_point, _ = break_curve(curve)
+        
+        if break_point <= 5:
+            self.interc = None
+            self.coef = None
+            break_point = 100
 
-    def get_segm_prob(self):
-        assert len(self.probabilities) == len(self.segments)
-        for segm, prob in zip(self.segments, self.probabilities):
-            yield segm, prob[1]
+        x_min = min(unknown_projections)
+        x_max = max(unknown_projections)
+        self.break_point_proj = break_point / 100 * (x_max - x_min) + x_min
+        self.step = (x_max - x_min) / 100
+        self.dist_to_break = (projections - self.break_point_proj) / self.step
 
-    def add_isoclines(self, prob, isoclines, transformed):
+    def get_segm_dist_to_break(self):
+        assert len(self.dist_to_break) == len(self.segments)
+        return zip(self.segments, self.dist_to_break)
+
+    def add_isoclines(self, dist_to_break, isoclines):
         import matplotlib.pyplot as plt
-        if transformed: # If the plot is transformed - isoclines are not
-            x_fun = x_revfun = y_revfun = y_fun = lambda x: x
-        else:
-            x_fun = Group.coverage_fun
-            y_fun = Group.labels_fun
-            x_revfun = Group.coverage_revfun
-            y_revfun = Group.labels_revfun
-
         axes = plt.axis()
-        iso_x = x_revfun(np.linspace(*x_fun([max(axes[0], .001), axes[1]]), 100))
-        for p in isoclines:
-            interc = self.lr.intercept_[0] - math.log(p / (1 - p))
-            coeffs = self.lr.coef_[0]
 
-            iso_y = y_revfun(-(interc + coeffs[0] * x_fun(iso_x)) / coeffs[1])
-            plt.plot(iso_x, iso_y, alpha=1 if p == prob else .4, linewidth=1, c='k') #, label=str(p))
-            y_text = axes[2] + .1 * random.random() * (axes[3] - axes[2])
-            x_text = x_revfun(-(interc + coeffs[1] * y_fun(y_text)) / coeffs[0])
-            plt.text(x_text, y_text, str(p), fontsize=8, alpha=.5)
+        x = np.array([axes[0], axes[1]])
+        y = self.interc + x * self.coef
+        plt.plot(x, y, alpha=.5, c='black')
 
-    def draw(self, outp_name, prob, isoclines, transformed=False):
+        for dist in isoclines:
+            x0 = dist * self.step + self.break_point_proj
+            y0 = self.interc + x0 * self.coef
+            y = np.array([axes[2], axes[3]])
+            x = -self.coef * y + self.coef * y0 + x0
+            plt.plot(x, y, alpha=.5, c='green' if dist == dist_to_break else 'black')
+
+    def draw(self, outp_name, prob, isoclines):
         import matplotlib.pyplot as plt
         import matplotlib.colors as plt_col
-        from operator import attrgetter
         from itertools import compress
 
-        if transformed:
-            x_fun = Group.coverage_fun
-            x_revfun = Group.coverage_revfun
-            y_fun = Group.labels_fun
-            y_revfun = Group.labels_revfun
-        else:
-            x_fun = x_revfun = y_fun = y_revfun = lambda x: x
-
-        x = list(map(x_fun, map(attrgetter('coverage'), self.segments)))
-        y = list(map(y_fun, map(attrgetter('labels'), self.segments)))
+        x = np.log([segm.coverage_rate for segm in self.segments])
+        y = np.log([segm.labels for segm in self.segments])
         known = list(map(Segment.known, self.segments))
 
         colors = [plt_col.to_hex('xkcd:deep sky blue'), plt_col.to_hex('xkcd:tomato')]
@@ -113,45 +154,41 @@ class Group:
         plt.scatter(list(compress(x, np.logical_not(known))), list(compress(y, np.logical_not(known))),
                     c=colors[1], s=5, alpha=.5, label='Putative novel segments')
         axes = plt.axis()
-        self.add_isoclines(prob, isoclines, transformed)
+        self.add_isoclines(prob, isoclines)
        
         plt.xlim([axes[0], axes[1]])
         plt.ylim([axes[2], axes[3]])
         plt.legend(loc=4)
         plt.title(self.name)
 
-        fmt_x = '%s(%%s)' % x_fun.__name__ if transformed else '%s'
-        fmt_y = '%s(%%s)' % y_fun.__name__ if transformed else '%s'
-        plt.xlabel(fmt_x % 'Coverage')
-        plt.ylabel(fmt_y % 'CDR3s')
+        plt.xlabel('log(Coverage rate)')
+        plt.ylabel('log(#CDR3s)')
         plt.savefig(outp_name, dpi=500)
 
     def print_coefficients(self):
-        print('%s  intercept   coverage     labels' % self.name)
+        print('%s  intercept   coverage' % self.name)
         print(' ' * len(self.name), end='  ')
-        print('%9.4f' % self.lr.intercept_[0], end='  ')
-        print('%9.4f' % self.lr.coef_[0][0], end='  ')
-        print('%9.4f' % self.lr.coef_[0][1])
-        print()
+        print('%9.4f' % self.interc, end='  ')
+        print('%9.4f' % self.coef)
 
 
-def write_outp(groups, thr_prob, outp_success, outp_fail):
+def write_outp(groups, thr_dist, outp_success, outp_fail):
     import sys
 
     res = []
     for group in groups:
-        for segm, prob in group.get_segm_prob():
-            res.append((prob, group.writtable_name, segm))
-    res.sort(reverse=True, key=lambda x: (x[0], x[2].fitness()))
+        for segm, dist_to_break in group.get_segm_dist_to_break():
+            res.append((group.writtable_name, segm, dist_to_break))
+    res.sort(reverse=True, key=lambda x: (x[2], x[1].fitness()))
 
     for outp in [outp_success, outp_fail]:
         outp.write('# %s\n' % ' '.join(sys.argv))
-        outp.write('group\tdataset\tsegment\tprob\tcoverage\tlabels\tmismatches\t'
-                   'indels\tconsensus\tfull_seq\tcropped_seq\n')
+        outp.write('group\tdataset\tsegment\tdist_to_break\tcoverage\tcoverage_rate\t'
+                   'labels\tmismatches\tindels\tconsensus\tfull_seq\tcropped_seq\n')
 
-    for prob, group_name, segm in res:
-        outp = outp_success if prob >= thr_prob else outp_fail
-        outp.write('%s\t%s\n' % (group_name, segm.to_str(prob)))
+    for group_name, segm, dist_to_break in res:
+        outp = outp_success if dist_to_break >= thr_dist else outp_fail
+        outp.write('%s\t%s\n' % (group_name, segm.to_str(dist_to_break)))
 
 
 def load_input(inputs, datasets):
@@ -175,7 +212,7 @@ def load_input(inputs, datasets):
     return groups
 
 
-def draw_plots(groups, out_dir, prob, isoclines):
+def draw_plots(groups, out_dir, thr_dist):
     import os
 
     try:
@@ -186,12 +223,11 @@ def draw_plots(groups, out_dir, prob, isoclines):
     n = len(groups)
     if n == 0:
         return
-    fmt = '%s/group%%0%dd%%s.png' % (out_dir, 1 + int(math.log10(n)))
+    fmt = '%s/group%%0%dd.png' % (out_dir, 1 + int(math.log10(n)))
     
-    isoclines = sorted(set(isoclines) | {prob}) if isoclines is not None else []
+    isoclines = [0, thr_dist]
     for i, group in enumerate(groups):
-        group.draw(fmt % (i + 1, ''), prob, isoclines, False)
-        group.draw(fmt % (i + 1, '_transformed'), prob, isoclines, True)
+        group.draw(fmt % (i + 1), thr_dist, isoclines)
 
 
 def main():
@@ -217,14 +253,9 @@ def main():
                          help='Output directory with plots over each group (not required)')
 
     cl_args = parser.add_argument_group('Classification arguments')
-    cl_args.add_argument('--prob', metavar='Float', type=float, default=.8,
-                         help='Minimal logistic regression probability (default: %(default)s)')
+    cl_args.add_argument('-t', '--threshold', metavar='Float', type=float, default=10,
+                         help='Minimal distance to the break point (default: %(default)s)')
     cl_args.add_argument('--verbose', action='store_true', help='Print classification coefficients')
-
-    dr_args = parser.add_argument_group('Drawing arguments')
-    dr_args.add_argument('--isoclines', nargs='*', type=float, metavar='Float',
-                         help='Draw isoclines with the provided probabilities, \n'
-                         'if --isoclines is provided, --prob isocline is always included')
 
     other = parser.add_argument_group('Other arguments')
     other.add_argument('-h', '--help', action='help', help='Show this message and exit')
@@ -235,9 +266,9 @@ def main():
     groups = load_input(args.input, args.datasets)
     for group in groups:
         group.classify()
-    write_outp(groups, args.prob, *args.output)
+    write_outp(groups, args.threshold, *args.output)
     if args.plots:
-        draw_plots(groups, args.plots, args.prob, args.isoclines)
+        draw_plots(groups, args.plots, args.threshold)
 
     if args.verbose:
         for group in groups:

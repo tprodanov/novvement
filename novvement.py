@@ -53,15 +53,12 @@ def create_parser():
                           help='Penalty for extending a gap (default: %(default)s)')
 
     cl_args = parser.add_argument_group('Classifying putative novel segments')
-    cl_args.add_argument('--prob', metavar='Float', type=float, default=.8,
-                         help='Minimal logistic regression probability (default: %(default)s)')
+    cl_args.add_argument('--threshold', metavar='Float', type=float, default=10,
+                         help='Minimal distance to the break point (default: %(default)s)')
 
     dr_args = parser.add_argument_group('Drawing arguments')
     dr_args.add_argument('--skip-plots', action='store_true',
                          help='Do not draw plots')
-    dr_args.add_argument('--isoclines', nargs='+', type=float, metavar='Float', default=[.5],
-                         help='If not --no-plots, add these isoclines to the plots,\n'
-                         '--prob isocline is always included (default: %(default)s)')
 
     other = parser.add_argument_group('Other arguments')
     other.add_argument('-h', '--help', action='help', help='Show this message and exit')

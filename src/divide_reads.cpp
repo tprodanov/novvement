@@ -294,7 +294,7 @@ struct reads_subset {
         return lengths.size();
     }
 
-    void write(size_t index, std::ostream& reads_outp, std::ostream& summary_outp) const {
+    void write(size_t index, size_t total_reads, std::ostream& reads_outp, std::ostream& summary_outp) const {
         char name[50];
         sprintf(name, "%s:%zd", segment_.c_str(), index);
 
@@ -306,7 +306,8 @@ struct reads_subset {
             r.write_to(reads_outp, segment_, long_name);
         }
 
-        summary_outp << name << '\t' << reads_.size() << '\t' << labels << '\t';
+        summary_outp << name << '\t' << reads_.size() << '\t' << static_cast<float>(reads_.size()) / total_reads
+                     << '\t' << labels << '\t';
         write_errors_vec(consensus_, summary_outp);
         summary_outp << '\n';
     }
@@ -336,9 +337,6 @@ private:
 };
 
 
-
-
-
 std::vector<reads_subset> divide_while_possible(std::string const& segment, std::vector<read>&& reads,
                                     double max_significance, size_t min_subset_size, size_t n_pairs) {
     std::vector<reads_subset> subsets { reads_subset(segment, std::move(reads)) };
@@ -359,9 +357,10 @@ std::vector<reads_subset> divide_while_possible(std::string const& segment, std:
 }
 
 
-void write_subsets(std::vector<reads_subset> const& subsets, std::ostream& reads_outp, std::ostream& summary_outp) {
+void write_subsets(std::vector<reads_subset> const& subsets, size_t total_reads,
+                   std::ostream& reads_outp, std::ostream& summary_outp) {
     for (size_t i = 0; i < subsets.size(); ++i) {
-        subsets[i].write(i + 1, reads_outp, summary_outp);
+        subsets[i].write(i + 1, total_reads, reads_outp, summary_outp);
     }
 }
 
@@ -391,6 +390,15 @@ std::unordered_map<std::string, std::vector<read>> load_errors(std::istream& inp
 }
 
 
+size_t count_reads(std::unordered_map<std::string, std::vector<read>> const& reads) {
+    size_t count = 0;
+    for (auto const& entry : reads) {
+        count += entry.second.size();
+    }
+    return count;
+}
+
+
 int main(int argc, char *argv[]) {
     // Arguments:
     // stdin -- input reads
@@ -405,9 +413,11 @@ int main(int argc, char *argv[]) {
     size_t min_subset_size = std::stoi(argv[3]);
 
     auto reads = load_errors(std::cin);
+    size_t total_reads = count_reads(reads);
+
     for (auto entry : reads) {
         auto subsets = divide_while_possible(entry.first, std::move(entry.second), max_significance, min_subset_size, n_pairs);
         std::sort(subsets.rbegin(), subsets.rend(), reads_subset::subset_compare());
-        write_subsets(subsets, std::cout, std::cerr);
+        write_subsets(subsets, total_reads, std::cout, std::cerr);
     }
 }

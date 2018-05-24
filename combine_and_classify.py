@@ -132,7 +132,7 @@ class Group:
                                   color=colors[1], alpha=.5, label='Putative novel segments', bins=50)
 
         normal = scipy.stats.norm.pdf(bins)
-        plt.plot(bins, normal / sum(normal) * sum(count), linewidth=2)
+        plt.plot(bins, normal / sum(normal) * sum(count), c='black', alpha=.5)
         plt.plot([scipy.stats.norm.ppf(1 - pvalue)] * 2, [0, max(count)],
                  c='black', alpha=.5)
 

@@ -107,8 +107,6 @@ class Group:
         x = -self.coef * y + self.coef * y0 + x0 
         plt.plot(x, y, alpha=.5, c='black')
 
-#        plt.xlim([axes[0], axes[1]])
-#        plt.ylim([axes[2], axes[3]])
         plt.legend(loc=4)
         plt.title(self.name)
 
@@ -159,7 +157,7 @@ def write_outp(groups, thr_pvalue, outp_success, outp_fail):
     for group in groups:
         for segm, pvalue in group.get_segm_pvalue():
             res.append((group.writtable_name, segm, pvalue))
-    res.sort(reverse=True, key=lambda x: (x[2], x[1].fitness()))
+    res.sort(reverse=True, key=lambda x: (-x[2], x[1].fitness()))
 
     for outp in [outp_success, outp_fail]:
         outp.write('# %s\n' % ' '.join(sys.argv))
@@ -167,7 +165,7 @@ def write_outp(groups, thr_pvalue, outp_success, outp_fail):
                    'labels\tmismatches\tindels\tconsensus\tfull_seq\tcropped_seq\n')
 
     for group_name, segm, pvalue in res:
-        outp = outp_success if pvalue >= thr_pvalue else outp_fail
+        outp = outp_success if pvalue <= thr_pvalue else outp_fail
         outp.write('%s\t%s\n' % (group_name, segm.to_str(pvalue)))
 
 

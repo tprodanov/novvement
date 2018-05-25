@@ -248,6 +248,33 @@ struct reads_subset {
         return res;
     }
 
+    bool top_peak(float peak_rate, float noise_rate,
+                  error_tup& peak, size_t& error_count) const {
+        errors_map<size_t> counter;
+        for (auto const& r : reads_) {
+            for (auto const& err : r.get_current_errors()) {
+                counter[err] += 1;
+            }
+        }
+
+        float total = reads_.size();
+
+        bool found = false;
+        for (auto const& entry : counter) {
+            if (entry.second / total >= peak_rate && entry.second / total <= 1 - peak_rate) {
+                if (found) {
+                    return false;
+                }
+                found = true;
+                peak = entry.first;
+                error_count = entry.second;
+            } else if (entry.second / total >= noise_rate && entry.second / total <= 1 - noise_rate) {
+                return false;
+            }
+        }
+        return found;
+    }
+
     size_t count_reads_with(error_tup const& err) const {
         size_t count = 0;
         for (read const& r : reads_) {
@@ -283,6 +310,34 @@ struct reads_subset {
             res.emplace_back(segment_, std::move(reads2));
             return res;
         }
+        return res;
+    }
+
+    std::vector<reads_subset> divide_if_possible_1_peak(float peak_rate, float noise_rate, size_t min_subset_size) {
+        error_tup peak;
+        size_t peak_count;
+        std::vector<reads_subset> res;
+
+        if (!top_peak(peak_rate, noise_rate, peak, peak_count)) {
+            return res;
+        }
+
+        if (peak_count < min_subset_size || reads_.size() - peak_count < min_subset_size) {
+            return res;
+        }
+
+        std::vector<read> reads1;
+        std::vector<read> reads2;
+        for (size_t i = 0; i < reads_.size(); ++i) {
+            if (contains(reads_[i].get_current_errors(), peak)) {
+                reads1.push_back(std::move(reads_[i]));
+            } else {
+                reads2.push_back(std::move(reads_[i]));
+            }
+        }
+
+        res.emplace_back(segment_, std::move(reads1));
+        res.emplace_back(segment_, std::move(reads2));
         return res;
     }
 
@@ -338,7 +393,8 @@ private:
 
 
 std::vector<reads_subset> divide_while_possible(std::string const& segment, std::vector<read>&& reads,
-                                    double max_significance, size_t min_subset_size, size_t n_pairs) {
+                                    double max_significance, size_t min_subset_size, size_t n_pairs,
+                                    float peak_rate, float noise_rate) {
     std::vector<reads_subset> subsets { reads_subset(segment, std::move(reads)) };
     std::vector<reads_subset> res;
     while (subsets.size()) {
@@ -348,8 +404,15 @@ std::vector<reads_subset> divide_while_possible(std::string const& segment, std:
             subsets.pop_back();
             subsets.push_back(std::move(division[0]));
             subsets.push_back(std::move(division[1]));
+
         } else {
-            res.push_back(std::move(subset));
+            division = subset.divide_if_possible_1_peak(peak_rate, noise_rate, min_subset_size);
+            if (division.size()) {
+                res.push_back(std::move(division[0]));
+                res.push_back(std::move(division[1]));
+            } else {
+                res.push_back(std::move(subset));
+            }
             subsets.pop_back();
         }
     }
@@ -407,16 +470,21 @@ int main(int argc, char *argv[]) {
     // 1 -- significance
     // 2 -- pairs
     // 3 -- coverage
+    // 4 -- noise_rate
+    // 5 -- peak_rate
 
     double max_significance = std::stof(argv[1]);
     size_t n_pairs = std::stoi(argv[2]);
     size_t min_subset_size = std::stoi(argv[3]);
+    float noise_rate = std::stof(argv[4]);
+    float peak_rate = std::stof(argv[5]);
 
     auto reads = load_errors(std::cin);
     size_t total_reads = count_reads(reads);
 
     for (auto entry : reads) {
-        auto subsets = divide_while_possible(entry.first, std::move(entry.second), max_significance, min_subset_size, n_pairs);
+        auto subsets = divide_while_possible(entry.first, std::move(entry.second), max_significance, min_subset_size, n_pairs,
+                                             peak_rate, noise_rate);
         std::sort(subsets.rbegin(), subsets.rend(), reads_subset::subset_compare());
         write_subsets(subsets, total_reads, std::cout, std::cerr);
     }

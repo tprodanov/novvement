@@ -39,6 +39,9 @@ def create_parser():
                           help='Maximum number of evaluated pairs of errors (default: %(default)s)')
     div_args.add_argument('--subset-coverage', type=int, metavar='Int', default=50,
                           help='Minimum subset size (default: %(default)s)')
+    div_args.add_argument('--single-peak', type=float, metavar=('Float', 'Float'), default=[.2, .3], nargs=2,
+                          help='Two rates for single peak detection: noise rate and\n'
+                               'true peak rate (default: %(default)s)')
             
     hl_args = parser.add_argument_group('Merging labels using Hamming graph')
     hl_args.add_argument('--labels-tau', metavar='Int', type=int, default=3,

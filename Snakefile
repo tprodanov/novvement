@@ -123,9 +123,9 @@ rule divide_reads:
         'Dividing read sets: {wildcards.name}'
     shell:
         '{dir}/divide_reads.py -i {{input.filtered}} -r {{output.reads}} -s {{output.summary}} ' \
-        '-S {significance} -p {pairs} -c {coverage}' \
+        '-S {significance} -p {pairs} -c {coverage} -1 {noise} {peak}' \
             .format(dir=DIR, significance=config['significance'], pairs=config['pairs'],
-                    coverage=config['subset_coverage'])
+                    coverage=config['subset_coverage'], noise=config['single_peak'][0], peak=config['single_peak'][1])
 
 
 rule add_sequences:

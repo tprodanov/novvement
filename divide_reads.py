@@ -26,6 +26,9 @@ def main():
                           help='Maximum number of evaluated pairs of errors (default: %(default)s)')
     div_args.add_argument('-c', '--coverage', type=int, metavar='Int', default=50,
                           help='Minimum subset size (default: %(default)s)')
+    div_args.add_argument('-1', '--single-peak', type=float, metavar=('Float', 'Float'), nargs=2, default=[.1, .3],
+                          help='Two rates for single peak detection: first -- noise rate,\n'
+                               'second -- significant peak (default: %(default)s)')
 
     other = parser.add_argument_group('Other arguments')
     other.add_argument('-h', '--help', action='help', help='Show this message and exit')
@@ -44,7 +47,9 @@ def main():
     returncode = subprocess.run(['%s/bin/divide_reads' % current_dir,
                                  str(args.significance),
                                  str(args.pairs),
-                                 str(args.coverage)],
+                                 str(args.coverage),
+                                 str(args.single_peak[0]),
+                                 str(args.single_peak[1])],
                                 stdin=args.input,
                                 stdout=args.reads,
                                 stderr=args.summary).returncode
